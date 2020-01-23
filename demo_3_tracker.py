@@ -13,15 +13,7 @@ tkroot.withdraw()
 fd_opts = {}
 fd_opts['initialdir'] = [os.path.dirname(os.path.abspath(__file__))]
 
-ret=tracker.load_amigamodule('ProTracker-win32/modules/oxygene.mod') #M.K. (make_pattern: 2.8s)
-#ret = tracker.load_amigamodule('ProTracker-win32/modules/Tubbs and Valerie.mod')  # M.K.
-#ret = tracker.load_amigamodule('ProTracker-win32/modules/equinoxe.mod')  # M.K.
-#ret=tracker.load_amigamodule('ProTracker-win32/modules/POPCORN.MOD')  # M.K.
-#ret=tracker.load_amigamodule('ProTracker-win32/modules/equinoxe ii.mod') #M.K.
-#ret=tracker.load_amigamodule('ProTracker-win32/modules.stk/STK.ghostbusters')  # original 15 samples Soundtracker file
-
-
-#ret = tracker.load_amigamodule('TEST_0.MOD')  # M.K.
+ret = tracker.load_amigamodule('C:/code/personal/study/da231x/contrasts.mod')
 
 #################################################################
 #INIT SCREEN AND TRACKER
@@ -31,8 +23,7 @@ ret=tracker.load_amigamodule('ProTracker-win32/modules/oxygene.mod') #M.K. (make
 nr_rows=12
 resolution=(89*8,(nr_rows+5)*8)
 
-#init the tracker module and make pattern
-screen=tracker.init(0x40,resolution)
+screen = tracker.init(0x40,resolution)
 dummy, raw_pattern_text, cumtimings = tracker.make_pattern(True)
 
 #load a font
@@ -45,10 +36,11 @@ myfont = pygame.font.Font('C64_Pro_Mono-STYLE.ttf', 8)
 #################################################################
 
 #Construct screen from textfields
-if tracker.songtitle=="" : tracker.songtitle=tracker.filename
+if tracker.songtitle == "":
+    tracker.songtitle=tracker.filename
 textfields=[]
-str_songtitle="{:_<20}".format(tracker.songtitle[:20].replace(" ", "_").upper())
-str_samples="{:_<22}".format(tracker.samples[0]["name"][:22].replace(" ", "_").upper())
+str_songtitle = "{:_<20}".format(tracker.songtitle[:20].replace(" ", "_").upper())
+str_samples = "{:_<22}".format(tracker.samples[0]["name"][:22].replace(" ", "_").upper())
 str_samples="1234567890123456789012"
 tf_label_songtitle  = Textfield((1,1),"NAME:",True)
 tf_songtitle        = Textfield((6,1),str_songtitle,[],20)
@@ -347,7 +339,4 @@ while True:
                     samplenr=(samplenr+1) % 16
                     tf_samplenr.text="{:02d}".format(samplenr)
                     tf_samples.text = tracker.samples[samplenr]["name"]
-
-
             pass
-

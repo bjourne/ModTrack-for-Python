@@ -7,7 +7,7 @@ import pygame
 #################################################################
 
 #init the tracker module
-screen=tracker.init(0x40,(100,100))
+screen = tracker.init(0x40,(100,100))
 
 #make default/internal pattern
 tracker.make_pattern()
