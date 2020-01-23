@@ -119,7 +119,9 @@ def read_module(filename):
         sample["name"]=barr[offset:offset+22].decode("utf-8").replace('\x00', '')
 
         # sample len in words (1word=2bytes). 1st word overwritten by tracker
-        sample['len']=2*int.from_bytes(barr[offset+22:offset+24],byteorder="big",signed=False)
+        sample['len'] = 2*int.from_bytes(
+            barr[offset+22:offset+24],
+            byteorder="big",signed=False)
         sample["finetune"] = barr[offset + 24]#.decode("utf-8")
         sample["volume"] = barr[offset + 25]#.decode("utf-8")
         sample["repeat_from"] = 2 * int.from_bytes(barr[offset + 26:offset + 28],byteorder="big",signed=False)
@@ -237,7 +239,7 @@ def read_module(filename):
         # first two bytes always two zeros, and used for repeating is
         # the sample is to be terminated.
         sample_data=barr[offset+2:offset+sample_len]
-        sample["data"] = sample_data
+        sample['data'] = sample_data
         if d:
             print(i, "data offset: ", offset,
                   "len: ", sample_len, sample_data)

@@ -172,34 +172,6 @@ while True:
                     edited = False
                 # resume
                 player = tracker.play_pattern()
-            if event.key==pygame.K_SPACE:
-                if pause:#not is_playing:
-                    #set cursor
-                    cursor=(7,3 + nr_rows - play_offset)
-                    idx=first_textfield+(nr_rows-play_offset)*8
-                    active_textfield=textfields[idx]
-                    #we could play from cursor, but from now we resume from pause
-                    #we should reparse edited raw_track_pattern
-                    tf_status.text = "STATUS:RESYNTH"
-                    if edited:
-                        tracker.make_pattern(False,raw_pattern_text)
-                        edited = False
-                        tracker.play_pattern(None, tracker.get_play_pos())
-                    #resume
-                    else:
-                        tracker.resume_play()
-                    pause=False
-                    tf_status.text="STATUS:PLAY"
-                    print ("RESUME playback")
-                else:
-                    print("PAUSE playback")
-                    tf_status.text = "STATUS:PAUSE"
-                    pause=True
-                    tracker.pause_play()
-                    #set cursor and active_textfield
-                    cursor=(7,3 + nr_rows - offset )
-                    idx=first_textfield+(cursor[1]-3)*8
-                    active_textfield=textfields[idx]
             #Edit
             req_next_row  = False
             req_next_char = False
@@ -218,7 +190,7 @@ while True:
                         req_next_row = True
                         channel=((idx-first_textfield)%8)//2
                         print ("activerow, channel:",activerow, channel)
-                        raw_pattern_text[activerow][channel]=textfields[idx].text
+                        raw_pattern_text[activerow][channel] = textfields[idx].text
 
             #Navigate (only if not playing)
             if pause:

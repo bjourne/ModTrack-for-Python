@@ -1,10 +1,12 @@
 from modtrack import tracker
+from sys import argv
 import pygame
 
 #################################################################
 #LOAD AMIGA MOD FILE
 #################################################################
-ret=tracker.load_amigamodule('keys_to_imagina.mod')  # M.K. - instruments not playing or pattern in wrong order
+# M.K. - instruments not playing or pattern in wrong order
+ret=tracker.load_amigamodule(argv[1])
 
 #################################################################
 #INIT, MAKE AND PLAY
