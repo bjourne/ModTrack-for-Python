@@ -203,6 +203,7 @@ numpy.set_printoptions(precision=3, threshold=8, edgeitems=3, suppress=True)
 from threading import Thread
 import os
 
+from copy import deepcopy
 from sys import exit
 from time import sleep, time
 from pygame.mixer import Channel, get_num_channels, set_num_channels
@@ -658,72 +659,62 @@ def load_amigamodule(modfile):
 
     #find last pattern in table which is not 0
     if d:
-        print ("table-size:",len(loadmod.pattern_table))
+        print ("table-size:", len(loadmod.pattern_table))
     pattern = []
     pat_row_nrs=[]
     new_pat_start=0
-    import copy
-    for pos_nr in range(0, len(loadmod.pattern_table)):
+    for pos_nr in range(len(loadmod.pattern_table)):
         pat_nr = loadmod.pattern_table[pos_nr]
-        if d:
-            print("pos",pos_nr,"->",pat_nr)
-        pat_txt = copy.deepcopy(loadmod.patterns[pat_nr])  # we need to make a copy because we edit it if B or D present
+        # we need to make a copy because we edit it if B or D present
+        pat_txt = deepcopy(loadmod.patterns[pat_nr])
         nrs = list(range(64))
         row_nrs = [str(pos_nr)+" -> "+str(pat_nr)+":"+str(s)+"   "
                    for s in nrs]
 
-        first_row=new_pat_start
-        last_row=64
-        new_pos_nr=pos_nr+1
-        new_pat_start=0
+        first_row = new_pat_start
+        last_row = 64
+        new_pos_nr = pos_nr + 1
+        new_pat_start = 0
 
-        fnd=False
+        fnd = False
         for rownr, row in enumerate(pat_txt):
-            if fnd: break
+            if fnd:
+                break
             if d:
                 print ("      row:",rownr, row)
-            for seqnr,seq in enumerate(row):
+            for ichan, seq in enumerate(row):
                 eff_cmd=seq[7:8]
                 eff_val=int(seq[8:10],16)
                 # B - Position Jump
                 # Bxx : go to start of pattern at position xx in position list
-                if eff_cmd=="B":
-                    print ("    B FOUND",seq)
-                    pat_txt[rownr][seqnr] = seq[0:7] + "000"
+                if eff_cmd == "B":
+                    print("    B FOUND",seq)
+                    pat_txt[rownr][ichan] = seq[0:7] + "000"
                     new_pos_nr = eff_val
                     last_row=rownr+1
                     new_pat_start=0
                     fnd=True
                 # D - Pattern Break
                 # Dxx : go to row xx of next pattern in position list
-                elif eff_cmd=="D":
-                    if d: print("    D FOUND",seq)
-                    pat_txt[rownr][seqnr] = seq[0:7] + "000"
-                    last_row=rownr+1
+                elif eff_cmd == "D":
+                    print("    D FOUND", seq)
+                    pat_txt[rownr][ichan] = seq[0:7] + "000"
+
+                    last_row = rownr + 1
                     new_pos_nr = pos_nr +1
-                    #new_pat_start=eff_val
                     if d:
                         print ("   rownr", rownr)
-                    if d:
                         print("    last_row", last_row)
-                    if d:
                         print("    new_pos_nr", new_pos_nr)
-                    if d:
                         print("    new_pat_start", new_pat_start)
                     fnd = True
-
         if d:
             print ("first_row:last_row",first_row,last_row)
-        pattern=pattern+pat_txt[first_row:last_row]
-        pat_row_nrs=pat_row_nrs+row_nrs[first_row:last_row]
-        first_row=new_pat_start
-        pos_nr=new_pos_nr-1
-
-    if d:
-        for i,row in enumerate(zip(pat_row_nrs,pattern)):
-            if i>999: break
-            print (row)
-    #quit()
+        pattern = pattern + pat_txt[first_row:last_row]
+        pat_row_nrs = pat_row_nrs+row_nrs[first_row:last_row]
+        first_row = new_pat_start
+        pos_nr = new_pos_nr-1
+    print('rows', len(pattern))
     print(filename)
     print(songtitle)
     return pattern
@@ -862,7 +853,7 @@ def save(pytfilename):
 #TRACKER METHODS
 #################################################################
 
-def speed_and_tempo_to_msec(speed_hex = 0x06, tempo_hex = 0x7D):
+def speed_and_tempo_to_msec(speed_hex, tempo_hex):
     """Returns the duration of a tracker row (in msec) given the setting
     for speed and tempo.
     """
@@ -1013,12 +1004,13 @@ def sample_to_wave(sample, note, dur_msecs):
 
     return wave
 
-#For reference see:
+# For reference see:
 #  http://milkytracker.titandemo.org/docs/MilkyTracker.html#fx0xy
 #  http://coppershade.org/articles/More!/Topics/Protracker_Effect_Commands/
 #  https://www.youtube.com/watch?v=OmeuhvYoij0
 
-def modify_wave(sample, notes, effect_speedtempos, effect_cmds, effect_notes):
+def modify_wave(sample, notes,
+                effect_speedtempos, effect_cmds, effect_notes):
     """Takes a sample with audio data converts this to a wave with the
     correct frequences (notes), and applies all the effects
     (effect_cmds) and effect parameters (effect_notes) taking into
@@ -1039,35 +1031,29 @@ def modify_wave(sample, notes, effect_speedtempos, effect_cmds, effect_notes):
     should achieve (e.g. bend to note) :return: array with audio data
     (int16)
     """
-    #TODO:some effects with same cmd but 00 for value will continu cmd, 0x will change onlt par in cmd
-    #     see https://www.youtube.com/watch?v=ErrDlZf5ASM
-    #     problably easiest to rewrite effect_cmds so a 0 in second or later cmd is replaced by last given value on that position
-    #     but not all commands do this! e.g. not 1 and 2
+    # TODO: Some effects with same cmd but 00 for value will continu
+    # cmd, 0x will change onlt par in cmd see
+    # https://www.youtube.com/watch?v=ErrDlZf5ASM problably easiest to
+    # rewrite effect_cmds so a 0 in second or later cmd is replaced by
+    # last given value on that position but not all commands do this!
+    # e.g. not 1 and 2
 
     db = False
 
     # create row durations
-    effect_durs=[]
-    for speedtempo in effect_speedtempos:
-        effect_durs.append(speed_and_tempo_to_msec(speedtempo[0],speedtempo[1]))
+    effect_durs = [speed_and_tempo_to_msec(st[0], st[1])
+                   for st in effect_speedtempos]
 
     if db:
         print("-------------------------------")
-    if db:
         print("MODIFY WAVE")
-    if db:
-        print("  sample     : ", sample)
-    if db:
+        print("  sample     : ", sample['name'])
         print("  notes      : ", notes)
-    if db:
         print("  effect_durs: ", effect_durs)
-    if db:
         print("  speedtempo : ", effect_speedtempos)
 
     # First determine how long note should last
-    tot_dur = 0;
-    for dur in effect_durs:
-        tot_dur = tot_dur + dur
+    tot_dur = sum(effect_durs)
 
     # some effect shorten wave (freq shifting), so we build some slack
     # in
@@ -1133,7 +1119,7 @@ def modify_wave(sample, notes, effect_speedtempos, effect_cmds, effect_notes):
         lastrow = len(effect_cmds) - 1
         while irow <= lastrow:
             cmd = effect_cmds[irow][effect_nr]
-            speedtempo=effect_speedtempos[irow]
+            speedtempo = effect_speedtempos[irow]
             dur = effect_durs[irow]
             notes = effect_notes[irow]
             jrow = irow + 1
@@ -1162,15 +1148,11 @@ def modify_wave(sample, notes, effect_speedtempos, effect_cmds, effect_notes):
 
         if db:
             print("  WAVENOTE  : ", wavenote)
-        if db:
             print("  EFFECT COL: ", effect_nr)
-        if db:
-            print("  SPEEDTEMPO: ", neffect_speedtempos, "<-", effect_speedtempos)
-        if db:
+            print("  SPEEDTEMPO: ", neffect_speedtempos,
+                  "<-", effect_speedtempos)
             print("  DURATIONS : ", neffect_durs, "<-", effect_durs)
-        if db:
             print("  EFF. CMDS : ", neffect_cmds, "<-", effect_cmds)
-        if db:
             print("  EFF. NOTES: ", neffect_notes, "<-", effect_notes)
 
         # And now we apply all the effects one after another
@@ -1186,13 +1168,9 @@ def modify_wave(sample, notes, effect_speedtempos, effect_cmds, effect_notes):
             tempo = speedtempo[1]
             if db:
                 print ("  ...........")
-            if db:
                 print ("  NEXT EFFECT")
-            if db:
                 print ("    dur, speed, tempo, cmd,note              : ",dur, speed, tempo, cmd ,note)
-            if db:
                 print ("    sizes      - pre, window, trail -> total : ",first_sample, nr_samples, trailing_samples,"->",tot_samples)
-            if db:
                 print("    window pos - first, last                 : ",first_sample,last_sample)
             cmd_id = cmd[0]
             cmd_val = cmd[1:3]  # two bytes labeled x and y below
@@ -1288,7 +1266,9 @@ def modify_wave(sample, notes, effect_speedtempos, effect_cmds, effect_notes):
                 # trailing_samples has ending freq
                 #max bend for 1 octave (C-3 - B-3) at F06, F7D (120ms/row) is achieved at 7 rows, max bend of 2 octaves at 14 rows
 
-                if db: print ("nwave:",nwave.size,first_sample,nr_samples,trailing_samples)
+                if db:
+                    print ("nwave:", nwave.size, first_sample, nr_samples,
+                           trailing_samples)
                 rel_first_sample=first_sample/tot_samples
                 rel_last_sample=last_sample/tot_samples
 
@@ -1296,7 +1276,7 @@ def modify_wave(sample, notes, effect_speedtempos, effect_cmds, effect_notes):
                 steps_per_sec = 60
                 # Steps should increase if duration of effect
                 # increases, otherwise the steps will be heard.
-                steps=int(dur/1000*steps_per_sec)
+                steps = int(dur/1000*steps_per_sec)
                 if db:
                     print ("steps:",steps)
                 window_samples=int(nr_samples/steps)
@@ -1310,7 +1290,7 @@ def modify_wave(sample, notes, effect_speedtempos, effect_cmds, effect_notes):
                     note = 'B-3' #max note freq on any bend
                 if cmd_id == '2':
                     note = 'C-1' #min note freq on any bend
-                basenote=wavenote
+                basenote = wavenote
                 if db:
                     print ("NOTES:",note)
                 targetnote = note
@@ -1648,21 +1628,23 @@ def modify_wave(sample, notes, effect_speedtempos, effect_cmds, effect_notes):
 
 
 def split_sequence(seq_text):
-    """
-    Splits a text sequence to notes, instrument number and effect commands
-    :param seq_text: string e.g. 'C-3 E-3 01 343 000' in which the component order is not important
+    """Splits a text sequence to notes, instrument number and effect
+    commands
+
+    :param seq_text: string e.g. 'C-3 E-3 01 343 000' in which the
+    component order is not important
     :return: lists of notes, instr, effects
     """
     # C-3 E-3 G-3 01 343 000
     #notes are 3 characters with middle char '-' or '#'
     #second note is optional
     #instrument is 2 characters
-    notes=[]
+    notes = []
     effects = []
     instr = ''
-    parts=seq_text.split()
-    err=""
-    hexchars=('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F')
+    parts =seq_text.split()
+    err = ""
+    hexchars = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F')
     for part in parts:
         if len(part)==3 and \
              part[1] in ('-','#') and \
@@ -1688,9 +1670,12 @@ def split_sequence(seq_text):
         else:
             err=err+ "Syntax error in '"+part+"' of track sequence '"+seq_text+"'"
 
-    if err: raise ValueError(err)
-    while len(notes)<2: notes.append("---")
-    while len(effects) < 2: effects.append("000")
+    if err:
+        raise ValueError(err)
+    while len(notes)<2:
+        notes.append("---")
+    while len(effects) < 2:
+        effects.append("000")
     return notes, instr, effects
 
 def splitseq2str(splitseq):
@@ -1744,7 +1729,6 @@ def rewrite_pattern(pattern_text):
                 else: #consequetive rows
                     newseq = "---" + " "+instr+" " + effect + " " + preveffectadd
                 pattern_text[irow][ichannel] = newseq
-                print("(", ichannel, ",", irow, ")", seq, "->", newseq)
             if note != "---":#next note group
                     prevnote=note
 
@@ -1765,7 +1749,6 @@ def rewrite_pattern(pattern_text):
                 # xy for A is taken from sequence itself
                 newseq = seq[0:7]+ "3{0:0<2}".format(prev3xy)+" A"+seq[8:10]
                 pattern_text[irow][ichannel] = newseq
-                print("(", ichannel, ",", irow, ")", seq, "->", newseq)
 
             # for 6-command
             if cmd_id == '4':
@@ -1776,7 +1759,6 @@ def rewrite_pattern(pattern_text):
                 # xy for A is taken from sequence itself
                 newseq = seq[0:7]+ "4{0:0<2}".format(prev4xy)+" A"+seq[8:10]
                 pattern_text[irow][ichannel] = newseq
-                print("(", ichannel, ",", irow, ")", seq, "->", newseq)
 
             irow = irow + 1
 
@@ -1794,7 +1776,8 @@ def rewrite_pattern(pattern_text):
             seq = pattern_text[irow][ichannel]
             note, instr, effect = seq[0:3], seq[4:6], seq[7:10]
             cmd_id = effect[0:1]
-            if cmd_id == 'D': fnd=int(effect[1:3],10)
+            if cmd_id == 'D':
+                fnd = int(effect[1:3],10)
         if fnd>=0:
             blocknr=irow//64
             rownr=fnd
@@ -1815,21 +1798,21 @@ def rewrite_pattern(pattern_text):
 
         irow = irow - 1
 
-    # F00 command stops song, we can discard rest
-    lastrow = len(pattern_text) - 1
-    irow = lastrow
-    while irow >=0:
-        for ichannel in range(0, 4):
-            seq = pattern_text[irow][ichannel]
-            note, instr, effect = seq[0:3], seq[4:6], seq[7:10]
-            if effect == "F00":
-                print("F00 found at row:", irow)
-                print("old length      :", len(pattern_text))
-                del pattern_text[irow:]
-                print("new length      :", len(pattern_text))
-                irow=0
-                break
-        irow = irow - 1
+    # # F00 command stops song, we can discard rest
+    # lastrow = len(pattern_text) - 1
+    # irow = lastrow
+    # while irow >=0:
+    #     for ichannel in range(0, 4):
+    #         seq = pattern_text[irow][ichannel]
+    #         note, instr, effect = seq[0:3], seq[4:6], seq[7:10]
+    #         if effect == "F00":
+    #             print("F00 found at row:", irow)
+    #             print("old length      :", len(pattern_text))
+    #             del pattern_text[irow:]
+    #             print("new length      :", len(pattern_text))
+    #             irow=0
+    #             break
+    #     irow = irow - 1
     return
 
 def transpose(notes,nr_octaves):
@@ -1849,13 +1832,6 @@ def make_pattern_inner(pattern_text,
                        ichan,
                        pattern_rowspeedtempos,
                        pattern_refs):
-    """
-    :param pattern_text:
-    :param ichan:
-    :param pattern_rowspeedtempos:
-    :param pattern_refs:
-    :return:
-    """
     global samples, sound_lib, octave_transpose
 
     # We return var so address should remain same and =[] will assign
@@ -1890,9 +1866,7 @@ def make_pattern_inner(pattern_text,
         samplename = sample["name"]
         if c:
             print("-------------------------------")
-        if c:
             print("MAKE PATTERN - NEXT ROW")
-        if c:
             print("(" + str(ichan) + "," + str(irow) + ")", seq,
                   "(" + str(notes) + "," + "{:.1f}".format(freqs[notes[0]]) +
                   "Hz, #" + instr + "("+samplename+")," + str(effects) + ")")
@@ -1925,7 +1899,9 @@ def make_pattern_inner(pattern_text,
             else:
                 effect_cmds.append(next_effects)
                 effect_speedtempos.append(pattern_rowspeedtempos[jrow])
-                effect_notes.append(next_notes[1])  # only append second note, first_note should start new group
+                # Only append second note, first_note should start new
+                # group.
+                effect_notes.append(next_notes[1])
                 seq_id = seq_id + " ; " + "({:02x},{:02x})".format(
                     effect_speedtempos[0][0],
                     effect_speedtempos[0][1]) + ' ' + next_seq
@@ -1933,9 +1909,7 @@ def make_pattern_inner(pattern_text,
         if c:
             print("  effects :", len(effect_cmds),
                   effect_cmds, effect_speedtempos)
-        if c:
             print("  group id:", seq_id)
-        if c:
             print('  next row', irow_nextNote)
         if not seq_id in sound_lib:
             if c:
@@ -1943,7 +1917,9 @@ def make_pattern_inner(pattern_text,
 
             # we rely on modify_wave to padd/trunc wave to match full
             # duration of all rowtimings together
-            nwave = modify_wave(sample, notes, effect_speedtempos, effect_cmds,
+            nwave = modify_wave(sample, notes,
+                                effect_speedtempos,
+                                effect_cmds,
                                 effect_notes)
             snd = pygame.sndarray.make_sound(nwave)
             sound_lib[seq_id] = snd
@@ -1981,42 +1957,19 @@ def make_pattern(legacy = True, pattern_text = None):
     #Soundtracker) we need to do some rewriting, because the tracker
     #format is sometimes inconsequent
     d = False
-    if d:
-        for row in pattern_text:
-            print("OLD:",row)
     if legacy:
         rewrite_pattern(pattern_text)
-    if d:
-        for row in pattern_text:
-            print("NEW:",row)
-    # pattern_out = []
-    # for row in pattern_text:
-    #     seqs = []
-    #     for seq in row:
-    #         splitseq = split_sequence(seq)
-    #         newseq=splitseq2str(splitseq)
-    #         seqs.append(newseq)
-    #     pattern_out.append(seqs)
-    #     if d:
-    #         print(seqs)
-    # pattern_text = pattern_out
-
     pattern_text = [[splitseq2str(split_sequence(seq)) for seq in row]
                     for row in pattern_text]
 
     #first build row timings
-    pattern_rowspeedtempos=[]
+    pattern_rowspeedtempos = []
     ispeed  = 0x06
     itempo  = 0x7D
-    SPEED=0
-    TEMPO=1
     d = False
-    print('len pattern text', len(pattern_text))
-    for irow, row_text in enumerate(pattern_text):
+    for row_text in pattern_text:
         # Check if any row contains (multichan) speed commands (should
         # all be handled before playing samples.
-        if d:
-            print ("row:",row_text)
         speedCmds = []
         speedtempo = [ispeed, itempo]
         for sequence_text in row_text:
@@ -2031,10 +1984,7 @@ def make_pattern(legacy = True, pattern_text = None):
                         itempo = effectVal
                     speedtempo = [ispeed,itempo]
         pattern_rowspeedtempos.append(speedtempo)
-        if d:
-            print("ispeed, itempo, msec:", ispeed, itempo)
-    # This is the volume parameter which is set by the track.
-    volume = 0x20
+    print(len(pattern_rowspeedtempos), len(pattern_text))
     # Now build waves (and sounds0 from text sequences in
     # pattern_text.
     print("-------------------------------")
@@ -2066,27 +2016,6 @@ def make_pattern(legacy = True, pattern_text = None):
         lasttime = lasttime + rowtiming
         pattern_rowstarttimings.append(lasttime)
 
-    #clear unused library items
-    if d:
-        print("CLEAR")
-    del_keys=[]
-    for snd_key,snd_ref in sound_lib.items():
-        fnd = False
-        for ichan in range(0,4):
-            for ref in pattern_refs[ichan]:
-                if ref==snd_ref:
-                    fnd=True
-                if fnd: break
-            if fnd: break
-        #not found
-        if not fnd:
-            del_keys.append(snd_key)
-            if d:
-                print ("Del: ",snd_key)
-    for del_key in del_keys:
-        del sound_lib[del_key]
-
-    #return values and store in globals
     global soundrefs,rowstarttimings
     pattern = pattern_text
     soundrefs = pattern_refs

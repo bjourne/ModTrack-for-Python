@@ -43,7 +43,7 @@ def read_module(filename):
     #http://www.eblong.com/zarf/blorb/mod-spec.txt
     #http://web.archive.org/web/20120806024858/http://16-bits.org/mod/
     #ftp://ftp.modland.com/pub/documents/format_documentation/FireLight%20MOD%20Player%20Tutorial.txt
-    if barr[0:4]=="PP20":
+    if barr[0:4] == "PP20":
         #compressed with PowerPacker, we can't decode this
         return None
 
