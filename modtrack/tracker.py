@@ -250,11 +250,16 @@ notelist = [
     "C-", "C#", "D-", "D#", "E-", "F-",
     "F#", "G-", "G#", "A-", "A#", "B-"
 ]
-freqlist_oct8 = (4186.01,4434.92,4698.63,4978.03,5274.04,5587.65,5919.91,6271.93,6644.88,7040.00,7458.62,7902.13)
-freqs={'---': 0}
+FREQUENCIES = [
+    4186.01, 4434.92, 4698.63, 4978.03, 5274.04, 5587.65,
+    5919.91, 6271.93, 6644.88, 7040.00, 7458.62, 7902.13
+]
+
+freqs = {'---': 0}
+
 #Construct notes of all octaves
-for doct in range(0,8):
-    for note,freq8 in zip(notelist,freqlist_oct8):
+for doct in range(8):
+    for note, freq8 in zip(notelist, FREQUENCIES):
         oct=(8-doct)
         notename=note+str(oct)
         notefreq=freq8/2**doct
@@ -921,20 +926,16 @@ def clamp(n, minn, maxn):
     return max(min(maxn, n), minn)
 
 def pad_wave_to_duration(wave, duration):
-    """
-    Lengthens/truncs the audio data (wave) to the specified duration if necessary by adding zeros
-    """
-    global sample_rate
-    d=False
-    tot_samples= int(duration / 1000 * sample_rate)
+    """Lengthens/truncs the audio data (wave) to the specified duration
+    if necessary by adding zeros."""
+    tot_samples = int(duration / 1000 * SAMPLE_RATE)
     #Next pad wave with zeros to match duration
     if wave.size == 0:
-        nwave = numpy.zeros(tot_samples, numpy.int16)
+        nwave = np.zeros(tot_samples, np.int16)
     elif wave.size < tot_samples:
-        padLen = tot_samples - wave.size
-        nwave = numpy.pad(wave, (0, padLen), 'constant', constant_values=(0, 0))
-        if d:
-            print("pad:", tot_samples, wave.size,padLen, nwave.size,nwave)
+        pad_len = tot_samples - wave.size
+        nwave = np.pad(wave, (0, pad_len),
+                       'constant', constant_values=(0, 0))
     else:
         nwave = wave[:tot_samples]
     return nwave
@@ -1000,7 +1001,7 @@ def sample_to_wave(sample, note, dur_msecs):
 
     #nr_repeats is rounded down so we have to pad
     #also sample could be larger than duration
-    wave=pad_wave_to_duration(wave, dur_msecs)
+    wave = pad_wave_to_duration(wave, dur_msecs)
 
     return wave
 
@@ -1038,11 +1039,13 @@ def modify_wave(sample, notes,
     # last given value on that position but not all commands do this!
     # e.g. not 1 and 2
 
-    db = False
+    db = True
 
     # create row durations
+
     effect_durs = [speed_and_tempo_to_msec(st[0], st[1])
                    for st in effect_speedtempos]
+
 
     if db:
         print("-------------------------------")
@@ -1052,8 +1055,12 @@ def modify_wave(sample, notes,
         print("  effect_durs: ", effect_durs)
         print("  speedtempo : ", effect_speedtempos)
 
+
+
     # First determine how long note should last
     tot_dur = sum(effect_durs)
+
+
 
     # some effect shorten wave (freq shifting), so we build some slack
     # in
@@ -1068,6 +1075,11 @@ def modify_wave(sample, notes,
 
     # construct wave from sample
     freq = freqs.get(notes[0])
+
+    print(f'freq: {freq}')
+    exit(1)
+
+
     wavenote = notes[0]
     if freq != 0:
         if db:
@@ -1082,9 +1094,10 @@ def modify_wave(sample, notes,
     else:
         wave = numpy.array([], numpy.int16)
 
-    # without extra padding some effects which shorten the wave won't work correctly
-    # like effect 0 if last effect for note which tries to add a trail of negative size and will fail
-    # at end of modify_wave we shorten wave to real size
+    # Without extra padding some effects which shorten the wave won't
+    # work correctly like effect 0 if last effect for note which tries
+    # to add a trail of negative size and will fail at end of
+    # modify_wave we shorten wave to real size.
     nwave = pad_wave_to_duration(wave, tot_dur)
     if db:
         print("nwave.size, tot_dur:", nwave.size, tot_dur)
@@ -1100,16 +1113,16 @@ def modify_wave(sample, notes,
     if wavenote == "---":
         return nwave[:tot_samples_real]
 
-    # Then we set wave volume to general volume
-    # different from C command which only sends volume of 1 sample
-    # range of volume in track is 0-64 (0x00-0x40); master_volume is 0-255 (0x00-0xFF)
+    # Then we set wave volume to general volume different from C
+    # command which only sends volume of 1 sample range of volume in
+    # track is 0-64 (0x00-0x40); master_volume is 0-255 (0x00-0xFF).
     global volume, master_volume
     voli = volume / 64
     voli = voli * master_volume / 0xFF
     volf = numpy.full(tot_samples, voli)
 
     # Then we handle first-order effects, after which second-order effects
-    for effect_nr in range(0, 2):
+    for effect_nr in range(2):
         # Next see, if we have same effects to combine
         neffect_speedtempos = []
         neffect_durs = []
@@ -1132,7 +1145,9 @@ def modify_wave(sample, notes,
                     neffect_notes.append(notes)
                     i_nextrow = lastrow + 1
                     break
-                # we combine row with same effect unless effect is 0xy because this makes arpeggio logic much easier (always 2 cycles per row)
+                # We combine row with same effect unless effect is 0xy
+                # because this makes arpeggio logic much easier
+                # (always 2 cycles per row).
                 if effect_cmds[jrow][effect_nr] != cmd or (
                         cmd[0] == '0' and not cmd == '000'):  # or noteslist[jrow]!=notes:
                     neffect_cmds.append(cmd)
@@ -1178,9 +1193,14 @@ def modify_wave(sample, notes,
             cmd_x = int(cmd[1:2],16)   # for convenience
             cmd_y = int(cmd[2:3],16)   # for convenience
 
-            if cmd_id == '0' and not cmd=='000':  # Normal play of Arpeggio; xy first halfnote add, second
-                #Arpeggio not affected by speed unless speed <3 (than no (01) or fast (02) arpeggio)
-                #Tempo determines arpeggio freq (double tempo is double freq
+            # Normal play of Arpeggio; xy first halfnote add, second
+            if cmd_id == '0' and not cmd=='000':
+                # Arpeggio not affected by speed unless speed <3 (than
+                # no (01) or fast (02) arpeggio).
+
+                # Tempo determines arpeggio freq (double tempo is
+                # double freq).
+
                 x_wave=numpy.linspace(0,tot_samples,tot_samples)
                 if db:
                     print("tot_samples:",tot_samples)
@@ -1220,19 +1240,19 @@ def modify_wave(sample, notes,
                     if db:
                         print("first_sample1, first_sample2, first_sample3,first_sample_next:",
                               first_sample1, first_sample2, first_sample3,first_sample_next)
-                    x_sample1 = numpy.linspace(first_sample1, first_sample2, samples_pernote)
-                    x_sample2 = numpy.linspace(first_sample2, first_sample3, samples_pernote)
-                    x_sample3 = numpy.linspace(first_sample3, first_sample_next, samples_pernote)
-                    x_samples = numpy.append(x_samples, x_sample1)
-                    x_samples = numpy.append(x_samples, x_sample2)
-                    x_samples = numpy.append(x_samples, x_sample3)
+                    x_sample1 = np.linspace(first_sample1, first_sample2, samples_pernote)
+                    x_sample2 = np.linspace(first_sample2, first_sample3, samples_pernote)
+                    x_sample3 = np.linspace(first_sample3, first_sample_next, samples_pernote)
+                    x_samples = np.append(x_samples, x_sample1)
+                    x_samples = np.append(x_samples, x_sample2)
+                    x_samples = np.append(x_samples, x_sample3)
                     if db:
                         print("x_sample1, x_sample2, x_sample3,x_samples:", x_sample1.size, x_sample2.size, x_sample3.size,x_samples.size)
                     first_sample1 = first_sample_next
 
                 first_sample_trail=first_sample_next
-                x_pre = numpy.linspace(0, first_sample, first_sample)
-                x_shift = numpy.append(x_pre, x_samples)
+                x_pre = np.linspace(0, first_sample, first_sample)
+                x_shift = np.append(x_pre, x_samples)
 
                 # org samplenrs/x’s bij wave van 1000 samples: 0 – 200  -> 201 – 600 -> 601 – 1000
                 # new samplenrs/x’s bij wave van 1000 samples: 0 – 200  -> 201 – 700 -> 701 – 1000 + zeropad(100)
@@ -1241,14 +1261,14 @@ def modify_wave(sample, notes,
                 if db:
                     print ("samples_trail,samples_pad: ",samples_trail,samples_pad )
                 last_sample_trail = first_sample_trail + samples_trail
-                x_trail = numpy.linspace(first_sample_trail, last_sample_trail, samples_trail)
-                x_pad = numpy.full(samples_pad, 0,numpy.int16)
+                x_trail = np.linspace(first_sample_trail, last_sample_trail, samples_trail)
+                x_pad = np.full(samples_pad, 0,np.int16)
 
-                x_shift = numpy.append(x_shift, x_trail)
+                x_shift = np.append(x_shift, x_trail)
                 # This changes length of wave, so we have to repad wave to length of note
                 # first however we need to deplop to prevent plop with new padded zeros
                 x_shift = deplop_wave(x_shift, 0, 5)
-                x_shift = numpy.append(x_shift, x_pad)
+                x_shift = np.append(x_shift, x_pad)
 
                 #Because samples_pernote is a rounded down fraction of nr_samples
                 #we may have mismatching lengths. This mismatch is typically 6 samples of 5000
@@ -1259,7 +1279,7 @@ def modify_wave(sample, notes,
                 #now we interpolate
                 if db:
                     print ("interp sizes of x_shift, x_wave, nwave:",x_shift.size, x_wave.size, nwave.size)
-                nwave = numpy.interp(x_shift, x_wave, nwave).astype(numpy.int16)  # return ndarray
+                nwave = np.interp(x_shift, x_wave, nwave).astype(np.int16)  # return ndarray
             elif cmd_id == '1' or cmd_id == '2' or cmd_id == '3':  # Slide Up/Dwn/ToNote       ; xx upspeed
                 #prevSamples not effected,
                 # nr_samples freq is stretched/squeezed
@@ -1272,20 +1292,20 @@ def modify_wave(sample, notes,
                 rel_first_sample=first_sample/tot_samples
                 rel_last_sample=last_sample/tot_samples
 
-                x_wave = numpy.linspace(0, 1, tot_samples)
+                x_wave = np.linspace(0, 1, tot_samples)
                 steps_per_sec = 60
                 # Steps should increase if duration of effect
                 # increases, otherwise the steps will be heard.
                 steps = int(dur/1000*steps_per_sec)
                 if db:
                     print ("steps:",steps)
-                window_samples=int(nr_samples/steps)
-                #x_shift=numpy.array([],numpy.int16)
-                x_shift = numpy.linspace(0, rel_first_sample, first_sample)
+                window_samples = int(nr_samples/steps)
+                #x_shift=np.array([],np.int16)
+                x_shift = np.linspace(0, rel_first_sample, first_sample)
                 if db:
                     print("x_shift pre: ", x_shift.size)
                 min_samples = 1
-                max_samples = window_samples*100
+                max_samples = window_samples * 100
                 if cmd_id == '1':
                     note = 'B-3' #max note freq on any bend
                 if cmd_id == '2':
@@ -1312,51 +1332,56 @@ def modify_wave(sample, notes,
                     print ("min-max samples: ",min_samples,max_samples)
                 if db:
                     print ("rel_first_sample,rel_last_sample: ","%.3f" % rel_first_sample,"%.3f" % rel_last_sample)
-                for i in range (0,steps):
-                    if (i>0):ct=1
-                    fr= i/steps * (rel_last_sample-rel_first_sample) +rel_first_sample
-                    to= (i+1)/steps * (rel_last_sample-rel_first_sample) +rel_first_sample
-                    x_window = numpy.linspace(fr,to, window_samples)
-                    x_shift=numpy.append(x_shift,x_window[ct:])#we cut overlap in boundaries, this will cause x-shift to have #step samples less than it should be, but with normale usage (waves with ca 44.100 samples/sec and <50 steps/sec) this is unnoticable
+                for i in range(steps):
+                    if i > 0:
+                        ct=1
+                    fr = i / steps * (rel_last_sample - rel_first_sample) + rel_first_sample
+                    to = (i + 1) / steps * (rel_last_sample - rel_first_sample) + rel_first_sample
+                    print(window_samples)
+                    x_window = np.linspace(fr, to, window_samples)
+                    # We cut overlap in boundaries, this will cause
+                    # x-shift to have #step samples less than it
+                    # should be, but with normale usage (waves with ca
+                    # 44 100 samples/sec and <50 steps/sec) this is
+                    # unnoticable
+                    x_shift = np.append(x_shift,x_window[ct:])
                     if db:
-                        print ("x_window: ","%.3f" % fr,"-","%.3f" % to," #",window_samples, x_window)
-                    window_samples=window_samples+dsamples
-                    window_samples=clamp(window_samples,min_samples,max_samples)
+                        print ("x_window: ", "%.3f" % fr,"-", "%.3f" % to, " #", window_samples, x_window)
+                    window_samples = int(window_samples + dsamples)
+                    window_samples = clamp(window_samples, min_samples, max_samples)
 
                 if db:
                     print ("x_shift pre+win: ", x_shift.size,x_shift)
 
                 # x_shift already has head/pre and window, now only add trail
                 d = x_shift[x_shift.size - 1] - x_shift[x_shift.size - 2]
-                new_trailing_samples = (1 - rel_last_sample) / d+1
+                new_trailing_samples = (1 - rel_last_sample) / d + 1
                 if db:
                     print ("d :","%.4f" % d,"->",new_trailing_samples,"new_trailing_samples")
-                x_trail = numpy.linspace(rel_last_sample+d,1,new_trailing_samples)
-                x_shift = numpy.append(x_shift,x_trail)
+                x_trail = np.linspace(rel_last_sample + d, 1, int(new_trailing_samples))
+                x_shift = np.append(x_shift, x_trail)
                 if db:
                     print ("x_shift trl: ", x_trail.size,x_trail)
-                if db: print ("-------")
-                if db:
+                    print ("-------")
                     print ("x_shift: ",x_shift.size,x_shift)
-                if db:
                     print ("x_wave: ", x_wave.size, x_wave)
-                if db:
                     print ("nwave: ", nwave.size,nwave)
-                nwave = numpy.interp(x_shift, x_wave, nwave).astype(numpy.int16)  # return ndarray
+                nwave = np.interp(x_shift, x_wave, nwave).astype(np.int16)  # return ndarray
                 #This changes length of wave, so we have to repad wave to length of note
                 #first however we need to deplop to prevent plop with new padded zeros
                 nwave=deplop_wave(nwave,5,5)
                 nwave = pad_wave_to_duration(nwave, tot_dur)
             elif cmd_id == '4':  # Vibrato (alternate freq)      ; xy speed,depth
                 #freq is independent of speed but depends on tempo (half tempo is half freq
-                if db: print("nwave:", nwave.size, first_sample, nr_samples, trailing_samples)
-                if db: print("tot_samples:", tot_samples)
+                if db:
+                    print("nwave:", nwave.size, first_sample, nr_samples, trailing_samples)
+                    print("tot_samples:", tot_samples)
                 rel_first_sample = first_sample / tot_samples
                 rel_last_sample = last_sample / tot_samples
 
-                x_window = numpy.linspace(rel_first_sample, rel_last_sample, nr_samples)
-                x_trail = numpy.linspace(rel_last_sample, 1, trailing_samples)
-                x_wave = numpy.linspace(0,1,tot_samples)
+                x_window = np.linspace(rel_first_sample, rel_last_sample, nr_samples)
+                x_trail = np.linspace(rel_last_sample, 1, trailing_samples)
+                x_wave = np.linspace(0,1,tot_samples)
 
                 #dsamples=x_window[1]-x_window[0]                                  # increase sample spaceing to 2x dsamples reduces notefreq/2
                 dsamples = x_wave[first_sample+1] - x_wave[first_sample]  # increase sample spaceing to 2x dsamples reduces notefreq/2
@@ -1386,18 +1411,18 @@ def modify_wave(sample, notes,
                 #       adding a sinus wave to x-coords
                 #       addition has max of -100% of note down distance to 100% of note up distance
                 #1) make sin wave of needed freq
-                x_sinsamples = numpy.linspace(0,numpy.pi*2,x_window.size)
+                x_sinsamples = np.linspace(0,np.pi*2,x_window.size)
                 if db:
                     print ("x_samples: ",x_sinsamples )
-                x_sin=numpy.sin(x_sinsamples*freq)                    # x_windows from 0 to 1 we need 0 to 2*pi*freq
+                x_sin=np.sin(x_sinsamples*freq)                    # x_windows from 0 to 1 we need 0 to 2*pi*freq
                 #2) make amplitude array with length of 1 wave
                 #   and amplitudes max and min determined by note distance up and down
                 x_max = upfreq / basefreq - 1
                 x_min = 1 - downfreq / basefreq
                 a_halfwavesize=int(x_window.size/2/freq)
-                a_max = numpy.full(a_halfwavesize,x_max)
-                a_min = numpy.full(a_halfwavesize,x_min) #shortening distance moves freq to up note, so a_min is determined by x_max (upfreq/basefreq-1)
-                x_amp=numpy.append(a_max,a_min)
+                a_max = np.full(a_halfwavesize,x_max)
+                a_min = np.full(a_halfwavesize,x_min) #shortening distance moves freq to up note, so a_min is determined by x_max (upfreq/basefreq-1)
+                x_amp=np.append(a_max,a_min)
                 if db:
                     print("x_window      : ", x_window.size)
                 if db:
@@ -1419,7 +1444,7 @@ def modify_wave(sample, notes,
                 #3) tile amplitude array to length of sinus wave / window
                 nr_amp = math.ceil(x_sin.size/x_amp.size)
                 halfpisamplenr = x_amp.size/4
-                x_amp = numpy.tile(x_amp,nr_amp)
+                x_amp = np.tile(x_amp,nr_amp)
                 if db:
                     print("nr_amp      : ", nr_amp)
                 if db:
@@ -1429,18 +1454,18 @@ def modify_wave(sample, notes,
                 #4) scale sinus to amplitude and account for rel_strength
                 x_d = x_sin*x_amp
                 if db:
-                    print ("min,max of x_d: ", numpy.amin(x_d),numpy.amax(x_d))
+                    print ("min,max of x_d: ", np.amin(x_d),np.amax(x_d))
                 x_d = x_d*rel_strength
                 if db:
-                    print("min,max of x_d: ", numpy.amin(x_d), numpy.amax(x_d))
+                    print("min,max of x_d: ", np.amin(x_d), np.amax(x_d))
                 #   and make max shift (if x_amp=1) equal to dsamples
                 x_d = x_d*dsamples
                 if db:
-                    print("min,max of x_d: ", numpy.amin(x_d), numpy.amax(x_d))
+                    print("min,max of x_d: ", np.amin(x_d), np.amax(x_d))
                 #   max_shift is relative to previous sample, so x_s[i]=x_s[i-1]+x_d[i]
-                x_s = numpy.cumsum(x_d)
+                x_s = np.cumsum(x_d)
                 if db:
-                    print("min,max of x_s: ", numpy.amin(x_d), numpy.amax(x_d))
+                    print("min,max of x_s: ", np.amin(x_d), np.amax(x_d))
 
                 #5) now we scale amplitude to exact note oscillation:
                 #   a) the max slope of the sinus determines freq shift, max-slope of 1.0 is normal and is 1 octave
@@ -1453,39 +1478,32 @@ def modify_wave(sample, notes,
                 #compensate = compensate * maxFreqShift * rel_strength
                 if db:
                     print ("halfpisamplenr:", halfpisamplenr)
-                if db:
                     print ("x_d(0-1/2pi)  :", x_s[halfpisamplenr-1],x_s[halfpisamplenr],maxshift)
-                if db:
                     print ("rel_strength  :",rel_strength )
-                if db:
                     print ("dsamples      :", dsamples)
-                if db:
                     print ("max_x_d01     :",max_x_d01)
-                if db:
                     print ("compensate    : ", compensate)
                 x_s=x_s*compensate
 
                 #6) add shifts in x-coordinates (x_d) to x coordinates (x_windows)
+                x_shift_window = x_window + x_s
                 if db:
                     print("x_d     : ", x_d.size, x_d)
-                x_shift_window=x_window+x_s
-                if db:
                     print("x_window: ", x_window.size, x_window)
-                if db:
                     print("x_shift_window: ", x_shift_window.size, x_shift_window)
 
                 #7) add head/pre and trail to x_windows
                 x_shift_trail=x_trail+x_d[x_d.size-1]
                 #add last sample-displacement to prevent sudden amp change between window and trail and thus a pop
                 #however if x_d.size>0 then last x-coord in shift array will be > 1...
-                x_shift_pre = numpy.linspace(0, rel_first_sample, first_sample)
+                x_shift_pre = np.linspace(0, rel_first_sample, first_sample)
                 x_shift = x_shift_pre
-                x_shift = numpy.append(x_shift_pre,x_shift_window)
-                x_shift = numpy.append(x_shift,x_shift_trail)
+                x_shift = np.append(x_shift_pre,x_shift_window)
+                x_shift = np.append(x_shift,x_shift_trail)
                 if db: print("Size pre,window, trail, total: ",x_shift_pre.size,x_shift_window.size,x_shift_trail.size,x_shift.size)
 
                 #8) interpolate new
-                nwave = numpy.interp(x_shift, x_wave, nwave).astype(numpy.int16)  # return ndarray
+                nwave = np.interp(x_shift, x_wave, nwave).astype(np.int16)  # return ndarray
             elif cmd_id == '5':
                 # Tone Portamento + Volume Slide; xy upspeed, downspeed
                 #
@@ -1514,29 +1532,29 @@ def modify_wave(sample, notes,
                 #print ("freq,window:",freq,window)
                 if window==0: window=1
                 nr_windows = math.ceil(nr_samples / window + 1)
-                volrad = numpy.linspace(0, 2*numpy.pi, window)
-                volsin= numpy.sin(volrad)    # amplitud is from -1 to 1
+                volrad = np.linspace(0, 2*np.pi, window)
+                volsin= np.sin(volrad)    # amplitud is from -1 to 1
                 volsin= (volsin +1)/2 * voli # amplitude is from 0 to voli
                 volsin= volsin+(1-voli)       # amplitude is from (1-voli) to 1
                 #print("volsin:", volsin.size, volsin, volsin[volsin.size/4],volsin[3*volsin.size/4])
-                volw = numpy.tile(volsin, nr_windows)
+                volw = np.tile(volsin, nr_windows)
                 #print("nr_windows,volw: ", nr_windows, volw, voln.size, "/",nr_samples)
                 volw=volw[:nr_samples]
                 voli=volw[nr_samples-1] #see comment that volume is not reset after command
                 if voli==0: voli=1/255 # prevents total information loss so A cmd still works
                 volp = volw[:first_sample]
-                volt = numpy.full(trailing_samples, voli)
-                volf = numpy.append(volp, volw)
-                volf = numpy.append(volf, volt)
+                volt = np.full(trailing_samples, voli)
+                volf = np.append(volp, volw)
+                volf = np.append(volf, volt)
             elif cmd_id == '9':  # Set SampleOffset       ; xx offeset (23 -> 2300)
                 twave = wave[256*cmd_xy:]
                 if db:
                     print(cmd_val,cmd_xy)
                 if len(twave) == 0:
-                    nwave = numpy.zeros(tot_samples, numpy.int16)
+                    nwave = np.zeros(tot_samples, np.int16)
                 elif twave.size < tot_samples:
                     padLen = tot_samples - twave.size
-                    nwave = numpy.pad(twave, (0, padLen), 'constant', constant_values=(0, 0))
+                    nwave = np.pad(twave, (0, padLen), 'constant', constant_values=(0, 0))
                 else:
                     nwave = twave[:tot_samples]
             elif cmd_id == 'A':  # VolumeSlide	          ; xy upspeed, downspeed ; Ax0 slide up x, A0y slide down, Axy invalid handled as Ax0
@@ -1544,10 +1562,10 @@ def modify_wave(sample, notes,
                 # With effects C40, A01 and tempo F7D we have F03:1.9s;F04:1,7s;F05:1,58s;F06:1,52s;F08:1,46s;F0A:1,42s;F0C:1,38s;FA0:1,36s;FAE:1.32s
                 # Doubling tempo will half durations and v.v.
                 ref_tempo=0x7D
-                ref_speed=numpy.array([3,4,5,6,8,10,12,16,24,30])
-                ref_fadeout_dur=numpy.array([1.9,1.7,1.58,1.52,1.46,1.42,1.38,1.36,1.32,1.32])
+                ref_speed=np.array([3,4,5,6,8,10,12,16,24,30])
+                ref_fadeout_dur=np.array([1.9,1.7,1.58,1.52,1.46,1.42,1.38,1.36,1.32,1.32])
 
-                fade_out=numpy.interp(speed,ref_speed,ref_fadeout_dur)
+                fade_out=np.interp(speed,ref_speed,ref_fadeout_dur)
                 fade_out=fade_out*ref_tempo/tempo
                 fade_out_multiplier= 1.52/fade_out
                 if db: print (hex(speed),hex(tempo),fade_out,fade_out_multiplier)
@@ -1558,16 +1576,16 @@ def modify_wave(sample, notes,
                 volwt = volf[first_sample:]
                 if cmd_x!=0:   #slide up
                     voli=(10*dur/1000)*cmd_x / 15 * fade_out_multiplier
-                    volw_delta = numpy.linspace(0, voli, nr_samples, numpy.float16)
-                    volt_delta = numpy.full(trailing_samples,voli)
-                    volwt_delta=numpy.append(volw_delta,volt_delta)
+                    volw_delta = np.linspace(0, voli, nr_samples, np.float16)
+                    volt_delta = np.full(trailing_samples,voli)
+                    volwt_delta=np.append(volw_delta,volt_delta)
                     volwt=volwt+volwt_delta
                     if db: print("Volume slide UP : ",voli,"x100%")
                 else:  # slide down
                     voli=(1.23*dur/1000)*cmd_y / 15 * fade_out_multiplier
-                    volw_delta = numpy.linspace(0, voli, nr_samples, numpy.float16)
-                    volt_delta = numpy.full(trailing_samples, voli)
-                    volwt_delta=numpy.append(volw_delta,volt_delta)
+                    volw_delta = np.linspace(0, voli, nr_samples, np.float16)
+                    volt_delta = np.full(trailing_samples, voli)
+                    volwt_delta=np.append(volw_delta,volt_delta)
                     volwt=volwt-volwt_delta
                     if db: print("Volume slide DOWN : ",voli,"x100%")
                 if db:
@@ -1582,10 +1600,10 @@ def modify_wave(sample, notes,
                     print("volwt           : ", volwt.size, volwt)
                 if db:
                     print("volo,volwt      : ", volp.size,volwt.size)
-                volf = numpy.append(volp, volwt)
+                volf = np.append(volp, volwt)
                 if db:
                     print ("volf        : ",volf.size,volf)
-                #volf = numpy.clip(volf, 0, 2)
+                #volf = np.clip(volf, 0, 2)
                 #nwave=nwave*volf
                 #print("nwave clipped: ", nwave)
             elif cmd_id == 'B':  # Position Jump       ; xx songposition
@@ -1598,8 +1616,8 @@ def modify_wave(sample, notes,
                 voli= int(cmd_val,16) /64
                 voli= voli*master_volume/0xFF
                 volp = volf[0:first_sample]
-                voln = numpy.full(nr_samples+trailing_samples, voli)
-                volf = numpy.append(volp,voln) #faster than numpy.pad
+                voln = np.full(nr_samples+trailing_samples, voli)
+                volf = np.append(volp,voln) #faster than np.pad
             elif cmd_id == 'D':  # Pattern Break       ; xx break position in next pattern
                 #handled in load_amigamodule()
                 pass
@@ -1612,17 +1630,17 @@ def modify_wave(sample, notes,
 
             # check if tot_samples equals length of nwave
             if not nwave.size == tot_samples:
-                errmsg = "Total size of nwave changed ("+str(tot_samples)+"->"+str(nwave.size)+")! Bug present in effect " + cmd_id+" ("+cmd+")."
+                errmsg = "Total size of nwave changed (" + str(tot_samples) + "->" + str(nwave.size) + ")! Bug present in effect " + cmd_id+" ("+cmd+")."
                 raise ValueError(errmsg)
 
     # we apply volume
-    volf = numpy.clip(volf, 0, 1)
+    volf = np.clip(volf, 0, 1)
     nwave = nwave * volf
 
     #finally we fade volume at last 5msec of signal to avoid pop at end
     nwave = nwave[:tot_samples_real]
     nwave = deplop_wave(nwave,5,5)
-    return nwave.astype(numpy.int16)
+    return nwave.astype(np.int16)
 
 #load_module('TEST_4.MOD')
 
@@ -1845,14 +1863,17 @@ def make_pattern_inner(pattern_text,
     c = False
     while irow <= lastrow:
         seq = pattern_text[irow][ichan]
+
         notes, instr, effects = split_sequence(seq)
         notes = transpose(notes, octave_transpose)
+        print(f'Sequence: {seq} notes: {notes}.')
+
         # notes[1] not supported for chords, only for special effects
         # like #3 and #5
-        note = notes[0] if notes else "---"
+        # note = notes[0] if notes else "---"
 
-        # sometimes the instrument number is omitted, this means the
-        # last instrument is still active
+        # Sometimes the instrument number is omitted, this means the
+        # last instrument is still active.
 
         if instr == "00":
             instr = lastinstr
@@ -1864,12 +1885,6 @@ def make_pattern_inner(pattern_text,
 
         sample = samples[sample_idx]
         samplename = sample["name"]
-        if c:
-            print("-------------------------------")
-            print("MAKE PATTERN - NEXT ROW")
-            print("(" + str(ichan) + "," + str(irow) + ")", seq,
-                  "(" + str(notes) + "," + "{:.1f}".format(freqs[notes[0]]) +
-                  "Hz, #" + instr + "("+samplename+")," + str(effects) + ")")
 
         # Gather positions(rows) and effects associated with note
         # (first col contains '---') and also construct id for row
@@ -1915,8 +1930,8 @@ def make_pattern_inner(pattern_text,
             if c:
                 print("mp-sample", sample)
 
-            # we rely on modify_wave to padd/trunc wave to match full
-            # duration of all rowtimings together
+            # We rely on modify_wave to padd/trunc wave to match full
+            # duration of all rowtimings together.
             nwave = modify_wave(sample, notes,
                                 effect_speedtempos,
                                 effect_cmds,
