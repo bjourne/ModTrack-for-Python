@@ -257,14 +257,14 @@ FREQUENCIES = [
 
 freqs = {'---': 0}
 
-#Construct notes of all octaves
+# Construct notes of all octaves
 for doct in range(8):
     for note, freq8 in zip(notelist, FREQUENCIES):
-        oct=(8-doct)
-        notename=note+str(oct)
-        notefreq=freq8/2**doct
+        oct = (8-doct)
+        notename = note+str(oct)
+        notefreq = freq8/2**doct
         #print (notename,notefreq)
-        freqs[notename]=notefreq
+        freqs[notename] = notefreq
 
 base_freq=freqs['C-3']
 octave_transpose=0
@@ -1076,8 +1076,8 @@ def modify_wave(sample, notes,
     # construct wave from sample
     freq = freqs.get(notes[0])
 
-    print(f'freq: {freq}')
-    exit(1)
+    # print(f'freq: {freq}')
+    # exit(1)
 
 
     wavenote = notes[0]
@@ -1425,21 +1425,13 @@ def modify_wave(sample, notes,
                 x_amp=np.append(a_max,a_min)
                 if db:
                     print("x_window      : ", x_window.size)
-                if db:
                     print("dsamples      : ", "%.9f" % dsamples)
-                if db:
                     print("cmd,freq      : ", cmd_x, freq)
-                if db:
                     print("cmd,rel_streng: ", cmd_y,rel_strength)
-                if db:
                     print("x_sin (amp=1) : ", x_sin.size,x_sin)
-                if db:
                     print("note, up, down: ", "{} ({:.1f}Hz), {} ({:.1f}Hz), {} ({:.1f}Hz)".format(basenote,basefreq,upnote,upfreq,downnote,downfreq))
-                if db:
                     print("x_min, a_min  : ", "%.3f" % x_min,a_min.size,a_min)
-                if db:
                     print("x_max, a_max  : ", "%.3f" % x_max,a_max.size,a_max)
-                if db:
                     print("x_amp         : ", x_amp.size, x_amp)
                 #3) tile amplitude array to length of sinus wave / window
                 nr_amp = math.ceil(x_sin.size/x_amp.size)
@@ -1474,15 +1466,8 @@ def modify_wave(sample, notes,
                 #       - and accounting for strength of effect )rel)strength)
                 maxshift=x_s[int(halfpisamplenr)]-x_s[int(halfpisamplenr)-1]
                 max_x_d01=(upfreq/basefreq - 1)*rel_strength*dsamples
-                compensate = 1#max_x_d01/maxshift
-                #compensate = compensate * maxFreqShift * rel_strength
-                if db:
-                    print ("halfpisamplenr:", halfpisamplenr)
-                    print ("x_d(0-1/2pi)  :", x_s[halfpisamplenr-1],x_s[halfpisamplenr],maxshift)
-                    print ("rel_strength  :",rel_strength )
-                    print ("dsamples      :", dsamples)
-                    print ("max_x_d01     :",max_x_d01)
-                    print ("compensate    : ", compensate)
+                compensate = 1
+
                 x_s=x_s*compensate
 
                 #6) add shifts in x-coordinates (x_d) to x coordinates (x_windows)
