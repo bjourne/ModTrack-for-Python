@@ -8,21 +8,6 @@ import pygame
 
 tracker.songtitle="byhand"
 
-#we can load a external sample, sample numbers are offset by 1
-#tracker.wav2sample('samples/sin_c3_u8b_pcm_8287Hz.wav',0x10,1)
-#tracker.wav2sample('samples/sin_c3_u8b_pcm_16574Hz.wav',0x10,4)
-#tracker.wav2sample('samples/ClassicGuitar_C3.wav',0x10,4)
-#tracker.wav2sample('samples/Flute_C2.wav',0x10,4)
-#tracker.wav2sample('samples/bowl_c6.wav',0x10,4)
-
-#tracker.wav2sample('samples/HumanVoice_C4_32Flt.wav',0x10,4)
-#tracker.wav2sample('samples/HumanVoice_C4_U8Int.wav',0x10,4)
-#tracker.wav2sample('samples/HumanVoice_C4_S16Int.wav',0x40,4)
-#tracker.wav2sample('samples/HumanVoice_C4_S32Int.wav',0x10,4)
-#tracker.wav2sample('samples/HumanVoice_C4_S24Int.wav',0x10,4)
-#tracker.wav2sample('samples/Piano_C3_U8B_PCM_8287Hz.wav',0x10,4)
-
-
 usr_waveform4= ["          x xx      ",
                 "         x x  x     ",
                 " x x x  x     x     ",

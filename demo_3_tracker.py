@@ -6,7 +6,6 @@ from textfield import Textfield
 #for file dialogs
 import tkinter as tk
 import os
-
 from sys import argv
 from tkinter import filedialog
 from tkinter import messagebox
@@ -294,17 +293,6 @@ while True:
                     file_path = filedialog.asksaveasfilename(**fd_opts)
                     if file_path:
                         tracker.clear(file_path)
-
-                if tf_samples.is_selected(c):
-                    tkroot.lift()
-                    tkroot.focus_force()
-                    fd_opts['title'] = 'Load Sample'
-                    fd_opts['filetypes'] = [('WAV files', '.wav')]
-                    file_path = filedialog.askopenfilename(**fd_opts)
-                    if file_path:
-                        tracker.samples[samplenr] = tracker.wav2sample(file_path)
-                        tf_samples.text = tracker.samples[samplenr]["name"]
-                        edited = True
 
                 if tf_prev.is_selected(c):
                     samplenr=(samplenr-1) % 16

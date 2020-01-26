@@ -27,7 +27,6 @@ The basic framework is:
   1) Import modtrack              - from modtrack import tracker
   2) Init modtrack                - tracker.init
   3) Load or specify your song    - tracker.load / tracker.load_amigamodule / song array=[[--- --- 00 000 000],[--- --- 00 000 000]]
-  4) load samples (optionally)    - wav2sample / tracker.custom_waveform
   5) Synthesize the song          - tracker.make_pattern
   6) Play the song                - tracker.play_pattern
 
@@ -78,7 +77,6 @@ Samples (instruments) can be internal, wav files or custom waveforms:
     load (pytfilename)               - load song in native Modtrack format
     save (pytfilename)               - save song in native Modtrack format
     load_amigamodule (modfile)       - load song in Ultimate Soundtracker and ProTracker format
-    wav2sample (filename,volume,samplenr=-1)
                                      - loads wav file, and amplifies to required volume and returns a sample (optionally set at samplenr)
     custom_waveform (usr_waveform_array, volume, samplenr, name)
                                      - converts a wavefrom array and returns a sample (optionally set at samplenr)

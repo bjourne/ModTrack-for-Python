@@ -12,7 +12,7 @@ ret=tracker.load_amigamodule(argv[1])
 #INIT, MAKE AND PLAY
 #################################################################
 
-screen = tracker.init(0x40,(100,100))
+screen = tracker.init((100,100))
 # True because we load a legacy module format ([C-2 01 F01] instead of
 # [C-2 --- 01 F01 ---])
 tracker.make_pattern(True)
