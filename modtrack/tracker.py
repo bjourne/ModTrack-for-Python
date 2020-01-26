@@ -255,7 +255,7 @@ FREQUENCIES = [
     5919.91, 6271.93, 6644.88, 7040.00, 7458.62, 7902.13
 ]
 
-freqs = {'---': 0}
+FREQS = {'---': 0}
 
 # Construct notes of all octaves
 for doct in range(8):
@@ -264,9 +264,10 @@ for doct in range(8):
         notename = note+str(oct)
         notefreq = freq8/2**doct
         #print (notename,notefreq)
-        freqs[notename] = notefreq
+        FREQS[notename] = notefreq
 
-base_freq=freqs['C-3']
+BASE_FREQ = FREQS['C-3']
+print(BASE_FREQ)
 octave_transpose=0
 
 def nth_halfnote(note,n):
@@ -275,8 +276,8 @@ def nth_halfnote(note,n):
     The n in n-th-note can be positive or negative.
     """
     for notenr, notename in enumerate(notelist):
-        if notename==note[0:2]:
-            next_notenr=notenr+n
+        if notename == note[0:2]:
+            next_notenr = notenr+n
             next_oct=int(note[2])
             if next_notenr<0:
               next_oct=next_oct-1
@@ -326,8 +327,8 @@ def whitenoise_sample(sample,nr_samples,amp):
 def init_samples():
     """Adds some basic waveforms to the (empty samples) list, like
     saw(tooth), tri(angle), pulse, sin(us) and empy wave."""
-    nr_samples = int(sample_rate / base_freq)
-    waves_in_3secs = int(3 * base_freq)
+    nr_samples = int(sample_rate / BASE_FREQ)
+    waves_in_3secs = int(3 * BASE_FREQ)
     amp = 255 * 32
     saw = np.zeros(nr_samples,numpy.int16)
     tri = np.zeros(nr_samples,numpy.int16)
@@ -401,7 +402,7 @@ songtitle="demo"
 #simplepattern = "C2- D2-- E2- F2--"
 
 def custom_waveform(usr_waveform_array,volume=0x40,samplenr=-1,name=None):
-    nr_samples = int(sample_rate / base_freq)
+    nr_samples = int(sample_rate / BASE_FREQ)
 
     usr_array=usr_waveform_array
     usr_width=len(usr_array[0])
@@ -873,8 +874,8 @@ def speed_and_tempo_to_msec(speed_hex, tempo_hex):
     #   7,2 sec: F06 F7D -> 0.12
     #  14,75 sec: F06 F3D
     #   4,8 sec: F06 FBD
-    tempo=tempo_hex
-    speed=speed_hex
+    tempo = tempo_hex
+    speed = speed_hex
     sec_per_beat=60/int(tempo_hex)
     sec_per_row=sec_per_beat/4
     #sec_per_row=speed*0.02*4*tempo/60
@@ -882,21 +883,23 @@ def speed_and_tempo_to_msec(speed_hex, tempo_hex):
     msec_per_row=int(sec_per_row*1000)
     return msec_per_row
 
-def stretch_sample_to_freq(freq,wform):
+def stretch_sample_to_freq(freq, wform):
     """Converts the audio data (wfrom) to a specific frequency (freq) by
     stretching the audio data.
     """
     #assumed is that sample is in C3
     #    and that sample rate is sample_rate
-    if wform.size<2: return wform
-    global base_freq
-    base_samples=wform.size
-    nr_samples = int(base_samples*base_freq/freq)
+    if wform.size < 2:
+        return wform
+
+    print('shape ', wform.shape)
+
+    base_samples = wform.size
+    nr_samples = int(base_samples * BASE_FREQ/freq)
     # construct x-points for wform and resulting/interpolated wave
-    x_wform = numpy.linspace(0, 1, wform.size)
-    x_wave = numpy.linspace(0, 1, nr_samples)
-    # resize wform to nrsamples
-    wave = numpy.interp(x_wave, x_wform, wform).astype(numpy.int16)  # return ndarray
+    x_wform = np.linspace(0, 1, wform.size)
+    x_wave = np.linspace(0, 1, nr_samples)
+    wave = np.interp(x_wave, x_wform, wform).astype(numpy.int16)  # return ndarray
     return wave
 
 def deplop_wave(nwave,fadein_msec,fadeout_msec):
@@ -966,7 +969,7 @@ def sample_to_wave(sample, note, dur_msecs):
         print("repeat_from,repeat_len,datalen:",
               repeat_from, repeat_len, datalen)
 
-    freq = freqs.get(note)
+    freq = FREQS.get(note)
     data_stretched = stretch_sample_to_freq(freq, data)
     ratio=data_stretched.size/data.size
     if repeat_from > 0:
@@ -1023,7 +1026,7 @@ def modify_wave(sample, notes,
     :param notes: notes (and thus freq) at which the audio data should
     be played back
 
-    :param effect_speedtempos: speed/tempo of each effect in msecs
+    effect_speedtempos: speed/tempo of each effect in msecs
 
     :param effect_cmds: effect command in hex and format Cxy, where C
     is command ID and xy the value parameters
@@ -1054,6 +1057,7 @@ def modify_wave(sample, notes,
         print("  notes      : ", notes)
         print("  effect_durs: ", effect_durs)
         print("  speedtempo : ", effect_speedtempos)
+    #exit(1)
 
 
 
@@ -1074,10 +1078,10 @@ def modify_wave(sample, notes,
         tot_dur = tot_dur * 2
 
     # construct wave from sample
-    freq = freqs.get(notes[0])
+    freq = FREQS.get(notes[0])
 
-    # print(f'freq: {freq}')
-    # exit(1)
+    print(f'note: {notes[0]} -> freq: {freq}')
+    #exit(1)
 
 
     wavenote = notes[0]
@@ -1208,9 +1212,9 @@ def modify_wave(sample, notes,
                 wavenote3 = nth_halfnote(wavenote, cmd_y)
                 if db:
                     print("wavenote, cmd, cmd_id, cmd_x, cmd_y:",wavenote, cmd, cmd_id, cmd_x, cmd_y)
-                f1=freqs.get(wavenote)
-                f2=freqs.get(wavenote2)
-                f3=freqs.get(wavenote3)
+                f1 = FREQS.get(wavenote)
+                f2 = FREQS.get(wavenote2)
+                f3 = FREQS.get(wavenote3)
                 if db:
                     print ("f1, f2, f3:",f1, f2, f3)
                 space1=1
@@ -1314,10 +1318,10 @@ def modify_wave(sample, notes,
                 if db:
                     print ("NOTES:",note)
                 targetnote = note
-                basefreq = freqs[basenote]
-                targetfreq = basefreq + (freqs[targetnote] - basefreq)
-                if targetfreq > freqs[targetnote]:
-                    targetfreq = freqs[targetnote]
+                basefreq = FREQS[basenote]
+                targetfreq = basefreq + (FREQS[targetnote] - basefreq)
+                if targetfreq > FREQS[targetnote]:
+                    targetfreq = FREQS[targetnote]
                 if db:
                     print ("basenote, targetnote: ", basenote, targetnote)
                 if basefreq < targetfreq:
@@ -1398,9 +1402,9 @@ def modify_wave(sample, notes,
                 downnote = prev_fullnote(basenote)
                 if db:
                     print ("wavenote,downnote,upnote:",wavenote,downnote,upnote)
-                basefreq = freqs[basenote]
-                upfreq   = freqs[upnote]
-                downfreq = freqs[downnote]
+                basefreq = FREQS[basenote]
+                upfreq   = FREQS[upnote]
+                downfreq = FREQS[downnote]
                 #to make it more stand out, we overshoot the one note up/down oscillation
                 upfreq   = upfreq   + (upfreq-basefreq)  *0.2
                 downfreq = downfreq + (downfreq-basefreq)*0.2
@@ -1439,7 +1443,6 @@ def modify_wave(sample, notes,
                 x_amp = np.tile(x_amp,nr_amp)
                 if db:
                     print("nr_amp      : ", nr_amp)
-                if db:
                     print("x_amp   : ", x_amp.size,x_amp)
                 x_amp = x_amp[:x_window.size]
 
@@ -1726,7 +1729,7 @@ def rewrite_pattern(pattern_text):
             if cmd_id == "3":
                 newseq=""
                 if note != "---":#first row
-                    freq_target=freqs[note]
+                    freq_target = FREQS[note]
                     newseq="---"+" "+instr+" "+effect+" "+note #note is removed for continues bend
                     preveffectadd=note
                 else: #consequetive rows
@@ -1800,22 +1803,6 @@ def rewrite_pattern(pattern_text):
             print ("rownrs:",len(rownrs),rownrs)
 
         irow = irow - 1
-
-    # # F00 command stops song, we can discard rest
-    # lastrow = len(pattern_text) - 1
-    # irow = lastrow
-    # while irow >=0:
-    #     for ichannel in range(0, 4):
-    #         seq = pattern_text[irow][ichannel]
-    #         note, instr, effect = seq[0:3], seq[4:6], seq[7:10]
-    #         if effect == "F00":
-    #             print("F00 found at row:", irow)
-    #             print("old length      :", len(pattern_text))
-    #             del pattern_text[irow:]
-    #             print("new length      :", len(pattern_text))
-    #             irow=0
-    #             break
-    #     irow = irow - 1
     return
 
 def transpose(notes,nr_octaves):
@@ -1840,6 +1827,9 @@ def make_pattern_inner(pattern_text,
     # We return var so address should remain same and =[] will assign
     # new mem slot.
     pattern_refs.clear()
+
+    print('len(pattern_text)', len(pattern_text))
+
     lastrow = len(pattern_text)-1
     lastinstr = "00"
     irow = 0
@@ -1876,6 +1866,7 @@ def make_pattern_inner(pattern_text,
         # collection
         effect_cmds = [effects]
         effect_speedtempos = [pattern_rowspeedtempos[irow]]
+
         seq_id = "({:02x},{:02x})".format(effect_speedtempos[0][0],
                                           effect_speedtempos[0][1]) \
                                           + ' ' + samplename +' '+seq
@@ -1906,17 +1897,20 @@ def make_pattern_inner(pattern_text,
                     effect_speedtempos[0][0],
                     effect_speedtempos[0][1]) + ' ' + next_seq
             jrow = jrow + 1
+
         if c:
             print("  effects :", len(effect_cmds),
                   effect_cmds, effect_speedtempos)
             print("  group id:", seq_id)
             print('  next row', irow_nextNote)
+
         if not seq_id in sound_lib:
             if c:
                 print("mp-sample", sample)
 
             # We rely on modify_wave to padd/trunc wave to match full
             # duration of all rowtimings together.
+
             nwave = modify_wave(sample, notes,
                                 effect_speedtempos,
                                 effect_cmds,
@@ -2125,8 +2119,10 @@ def play_pattern_inner(pattern_soundrefs = None, from_time = 0):
     pause_time = NOT_PAUSED #needed to restart on resume
     endtime = [0,0,0,0]
 
+    filtered_channels = [0]
+
     # Play first samples.
-    for ichan in range(4):
+    for ichan in filtered_channels:
         Channel(ichan).queue(first_snds[ichan])
 
     # Continue filling queues with new sounds and detect user events.
@@ -2159,7 +2155,7 @@ def play_pattern_inner(pattern_soundrefs = None, from_time = 0):
 
         # Keep queue filled, if empty add next sound to channel queue.
         if pause_time == NOT_PAUSED:
-            for ichan in range(4):
+            for ichan in filtered_channels:
                 if not Channel(ichan).get_queue():
                     if idx[ichan] < len(pattern_soundrefs[ichan]):
                         channel = pattern_soundrefs[ichan]

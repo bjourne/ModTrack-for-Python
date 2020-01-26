@@ -6,14 +6,17 @@ from textfield import Textfield
 #for file dialogs
 import tkinter as tk
 import os
+
+from sys import argv
 from tkinter import filedialog
 from tkinter import messagebox
+
 tkroot = tk.Tk()
 tkroot.withdraw()
 fd_opts = {}
 fd_opts['initialdir'] = [os.path.dirname(os.path.abspath(__file__))]
 
-ret = tracker.load_amigamodule('C:/code/personal/study/da231x/contrasts.mod')
+ret = tracker.load_amigamodule(argv[1])
 
 #################################################################
 #INIT SCREEN AND TRACKER
