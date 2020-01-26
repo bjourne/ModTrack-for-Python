@@ -25,7 +25,7 @@ ret = tracker.load_amigamodule(argv[1])
 nr_rows=12
 resolution=(89*8,(nr_rows+5)*8)
 
-screen = tracker.init(0x40,resolution)
+screen = tracker.init(resolution)
 dummy, raw_pattern_text, cumtimings = tracker.make_pattern(True)
 
 #load a font
