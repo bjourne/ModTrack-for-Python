@@ -204,21 +204,25 @@ from pygame.mixer import Channel, get_busy, get_num_channels, set_num_channels
 from pygame.sndarray import make_sound
 
 class DebugPrint:
-    def __init__(self):
+    def __init__(self, enabled):
         self.indent = 0
+        self.enabled = enabled
+
+    def print_indented(self, text):
+        if self.enabled:
+            print(' ' * self.indent + text)
 
     def header(self, name, fmt, args):
-        ind = ' ' * self.indent
-        print('%s* %s %s' % (ind, name, fmt % args))
+        self.print_indented('* %s %s' % (name, fmt % args))
         self.indent += 2
 
     def print(self, fmt, args):
-        print(' ' * self.indent + fmt % args)
+        self.print_indented(fmt % args)
 
     def leave(self):
         self.indent -= 2
 
-DP = DebugPrint()
+DP = DebugPrint(False)
 
 #################################################################
 # SET ALL TRACKER VARIABLES AND SOME MUTATION METHODS
@@ -237,8 +241,8 @@ MASTER_VOLUME = 0x40
 TRACK_VOLUME = 0x20
 
 # Enabled channels
-ENABLED_CHANNELS = [0]
-# ENABLED_CHANNELS = list(range(4))
+ENABLED_CHANNELS = [1]
+#ENABLED_CHANNELS = list(range(4))
 
 def init(resolution, depth=0):
     """
@@ -929,7 +933,9 @@ def handle_arpeggio(vol, nwave, note1, first_sample, n_samples, cmd_x, cmd_y):
     freqs = [FREQS.get(note) for note in notes]
     spaces = [1, freqs[1] / freqs[0], freqs[2] / freqs[0]]
 
-    DP.header('HANDLE ARPEGGIO', '%s', (spaces,))
+    spaces_str = '%.2f %.2f %.2f' % (spaces[0], spaces[1], spaces[2])
+    DP.header('ARPEGGIO', 'spaces [%s], %d samples',
+              (spaces_str, n_samples))
 
     n_cycles = 2
     samples_per_note = n_samples / 3 / n_cycles
@@ -942,6 +948,7 @@ def handle_arpeggio(vol, nwave, note1, first_sample, n_samples, cmd_x, cmd_y):
         to = int(at + samples_per_space[i % 3])
         x_samples.append(np.linspace(at, to, samples_per_note))
         at = to
+
     arpeggio_size = 2 * sum(samples_per_space)
 
     x_pre = np.linspace(0, first_sample, first_sample)
@@ -963,7 +970,7 @@ def handle_arpeggio(vol, nwave, note1, first_sample, n_samples, cmd_x, cmd_y):
     x_wave = np.linspace(0, nwave.size, nwave.size)
     x_wave = x_wave[:x_shift.size]
     vol = vol[:x_shift.size]
-    nwave = np.interp(x_shift, x_wave, nwave).astype(np.int16)
+    nwave = np.interp(x_shift, x_wave, nwave)
 
     DP.leave()
     return nwave, vol
@@ -1153,6 +1160,7 @@ def modify_wave(sample, notes,
                     dur = dur + effect_durs[jrow]
                 jrow = jrow + 1
             irow = i_nextrow
+        DP.print('Effect durations %s', neffect_durs)
 
         # And now we apply all the effects one after another
         first_sample = 0
@@ -1166,15 +1174,6 @@ def modify_wave(sample, notes,
             trailing_samples = tot_samples - last_sample
             speed = speedtempo[0]
             tempo = speedtempo[1]
-            if db:
-                print ("  NEXT EFFECT")
-                print ("    dur, speed, tempo, cmd, note             : ",
-                       dur, speed, tempo, cmd ,note)
-                print ("    sizes      - pre, window, trail -> total : ",
-                       first_sample, n_samples, trailing_samples,
-                       "->", tot_samples)
-                print("    window pos - first, last                 : ",
-                      first_sample, last_sample)
             cmd_id = cmd[0]
             cmd_val = cmd[1:3]  # two bytes labeled x and y below
             cmd_xy = int(cmd_val, 16)
@@ -1190,6 +1189,7 @@ def modify_wave(sample, notes,
                                               wavenote,
                                               first_sample, n_samples,
                                               cmd_x, cmd_y)
+                print(nwave.size, volf.size)
                 tot_samples = nwave.size
             # Slide Up/Dwn/ToNote       ; xx upspeed
             elif cmd_id in '123':
@@ -1493,8 +1493,8 @@ def modify_wave(sample, notes,
     nwave = nwave[:tot_samples_real]
     nwave = deplop_wave(nwave,5,5)
 
-    play_wave(nwave)
-    N_WAVES += 1
+    # play_wave(nwave)
+    # N_WAVES += 1
     # if N_WAVES == 2:
     #     exit(1)
 
