@@ -919,7 +919,9 @@ def handle_set_volume(vol, first_sample, cmd_x, cmd_y):
     vol_n = np.full(vol.size - first_sample, vol_i)
     return np.append(vol_p, vol_n)
 
-def handle_arpeggio(nwave, note1, n_samples, cmd_x, cmd_y):
+# This is probably not correct
+def handle_arpeggio(vol, nwave, note1, first_sample, n_samples, cmd_x, cmd_y):
+
     x_wave = np.linspace(0, nwave.size, nwave.size)
     note2 = nth_halfnote(note1, cmd_x)
     note3 = nth_halfnote(note1, cmd_y)
@@ -927,7 +929,55 @@ def handle_arpeggio(nwave, note1, n_samples, cmd_x, cmd_y):
     freqs = [FREQS.get(note) for note in notes]
     spaces = [1, freqs[1] / freqs[0], freqs[2] / freqs[0]]
 
-    samples_per_note = int(n_samples / 3 / 2)
+    DP.header('HANDLE ARPEGGIO', '%s', (spaces,))
+
+    n_cycles = 2
+    samples_per_note = n_samples / 3 / n_cycles
+    samples_per_space = [s * samples_per_note for s in spaces]
+
+    # Generate six notes
+    at = first_sample
+    x_samples = []
+    for i in range(3 * n_cycles):
+        to = int(at + samples_per_space[i % 3])
+        x_samples.append(np.linspace(at, to, samples_per_note))
+        at = to
+    arpeggio_size = 2 * sum(samples_per_space)
+
+    x_pre = np.linspace(0, first_sample, first_sample)
+    x_trail = np.linspace(first_sample + arpeggio_size,
+                          nwave.size,
+                          nwave.size - first_sample - arpeggio_size)
+    x_shift = np.concatenate([x_pre] + x_samples + [x_trail])
+    x_shift = deplop_wave(x_shift, 0, 5)
+
+    x_pad = np.full(int(arpeggio_size - n_samples), 0)
+    x_shift = np.append(x_shift, x_pad)
+
+    DP.print('pre/arp/post/pad %d/%d/%d/%d', (x_pre.size,
+                                              arpeggio_size,
+                                              x_trail.size,
+                                              x_pad.size))
+
+    nwave = nwave[:x_shift.size]
+    x_wave = np.linspace(0, nwave.size, nwave.size)
+    x_wave = x_wave[:x_shift.size]
+    vol = vol[:x_shift.size]
+    nwave = np.interp(x_shift, x_wave, nwave).astype(np.int16)
+
+    DP.leave()
+    return nwave, vol
+
+
+
+def create_arpeggio_cycles(first_sample, n_samples, n_cycles, freqs):
+    spaces = (1, freqs[1] / freqs[0], freqs[2] / freqs[0])
+
+    # x_samples = []
+    # samples_per_note = int(n_samples / 3 / n_cycles)
+    # x_samples = [
+    #     [np.linspace(first_sample     ] for idx in range(n_cycles)]
+    # ]
 
 
 def handle_volume_slide(vol, speed,
@@ -1061,7 +1111,7 @@ def modify_wave(sample, notes,
     # track is 0-64 (0x00-0x40); master_volume is 0-255 (0x00-0xFF).
     vol_i = TRACK_VOLUME / 64
     vol_i = vol_i * MASTER_VOLUME / 0xFF
-    volf = np.full(tot_samples, vol_i)
+    volf = np.full(nwave.size, vol_i)
 
     # Then we handle first-order effects, after which second-order
     # effects.
@@ -1134,90 +1184,13 @@ def modify_wave(sample, notes,
             # Normal play of Arpeggio; xy first halfnote add, second
             if cmd_id == '0' and not cmd == '000':
                 assert tot_samples == nwave.size
-
                 # Arpeggio not affected by speed unless speed <3 (than
                 # no (01) or fast (02) arpeggio).
-
-                # Tempo determines arpeggio freq (double tempo is
-                # double freq).
-
-                x_wave = np.linspace(0, nwave.size, nwave.size)
-                wavenote2 = nth_halfnote(wavenote, cmd_x)
-                wavenote3 = nth_halfnote(wavenote, cmd_y)
-
-                DP.print('Arpeggio %s: %s -> %s -> %s',
-                         (cmd, wavenote, wavenote2, wavenote3))
-                handle_arpeggio(nwave, wavenote, n_samples, cmd_x, cmd_y)
-
-                f1 = FREQS.get(wavenote)
-                f2 = FREQS.get(wavenote2)
-                f3 = FREQS.get(wavenote3)
-                if db:
-                    print ("f1, f2, f3:",f1, f2, f3)
-                space1 = 1
-                space2 = f2/f1
-                space3 = f3/f1
-                if db:
-                    print ("space1, space2, space3:",space1, space2, space3)
-
-                nrcycles = 2 # seems to by number of cycles in protracker
-                samples_pernote = int(n_samples / 3 / nrcycles)
-
-                x_samples = []
-                first_sample1 = first_sample
-                first_sample_next = None
-                for cycle in range(nrcycles):
-                    first_sample2 = int(first_sample1 + samples_pernote * space1)
-                    first_sample3 = int(first_sample2 + samples_pernote * space2)
-                    first_sample_next = int(first_sample3 + samples_pernote * space3)
-                    if db:
-                        print("first_sample1, first_sample2, first_sample3,first_sample_next:",
-                              first_sample1, first_sample2, first_sample3,first_sample_next)
-                    x_sample1 = np.linspace(first_sample1,
-                                            first_sample2,
-                                            samples_pernote)
-                    x_sample2 = np.linspace(first_sample2,
-                                            first_sample3,
-                                            samples_pernote)
-                    x_sample3 = np.linspace(first_sample3,
-                                            first_sample_next,
-                                            samples_pernote)
-                    x_samples = np.append(x_samples, x_sample1)
-                    x_samples = np.append(x_samples, x_sample2)
-                    x_samples = np.append(x_samples, x_sample3)
-                    if db:
-                        print("x_sample1, x_sample2, x_sample3,x_samples:", x_sample1.size, x_sample2.size, x_sample3.size,x_samples.size)
-                    first_sample1 = first_sample_next
-
-                first_sample_trail = first_sample_next
-                x_pre = np.linspace(0, first_sample, first_sample)
-                x_shift = np.append(x_pre, x_samples)
-
-                # org samplenrs/x’s bij wave van 1000 samples: 0 – 200  -> 201 – 600 -> 601 – 1000
-                # new samplenrs/x’s bij wave van 1000 samples: 0 – 200  -> 201 – 700 -> 701 – 1000 + zeropad(100)
-                samples_trail = tot_samples - first_sample_trail
-                samples_pad = (tot_samples - first_sample - n_samples) - samples_trail
-                last_sample_trail = first_sample_trail + samples_trail
-                x_trail = np.linspace(first_sample_trail, last_sample_trail, samples_trail)
-                x_pad = np.full(samples_pad, 0,np.int16)
-
-                x_shift = np.append(x_shift, x_trail)
-                # This changes length of wave, so we have to repad wave to length of note
-                # first however we need to deplop to prevent plop with new padded zeros
-                x_shift = deplop_wave(x_shift, 0, 5)
-                x_shift = np.append(x_shift, x_pad)
-
-                # Because samples_pernote is a rounded down fraction
-                # of n_samples we may have mismatching lengths. This
-                # mismatch is typically 6 samples of 5000.
-                nwave = nwave[:x_shift.size]
-                x_wave = x_wave[:x_shift.size]
-                volf = volf[:x_shift.size]
+                nwave, volf = handle_arpeggio(volf, nwave,
+                                              wavenote,
+                                              first_sample, n_samples,
+                                              cmd_x, cmd_y)
                 tot_samples = nwave.size
-                #now we interpolate
-                if db:
-                    print ("interp sizes of x_shift, x_wave, nwave:",x_shift.size, x_wave.size, nwave.size)
-                nwave = np.interp(x_shift, x_wave, nwave).astype(np.int16)  # return ndarray
             # Slide Up/Dwn/ToNote       ; xx upspeed
             elif cmd_id in '123':
                 #prevSamples not effected,
