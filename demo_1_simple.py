@@ -28,7 +28,6 @@ tracker.custom_waveform(usr_waveform1,0x10,1)
 # a pattern is 64 rows (positions) and 4 cols (tracks/channels)
 # format Note(#) Sharp/Flat(#) Octave(#) Instrument(##) Effect(###)
 
-tracker.octave_transpose=1
 pop_corn=[
     ["C-3 04 000", "C-1 01 C05", "--- 00 000", "--- 00 000"],#00
     ["--- 04 000", "--- 01 000", "--- 00 000", "--- 00 000"],#01
@@ -96,14 +95,14 @@ pop_corn=[
     ["--- 04 000", "G-1 01 000", "--- 00 000", "--- 00 000"],#63
 ]
 
-pop_corn=pop_corn+pop_corn
+pop_corn = pop_corn + pop_corn
 
 #################################################################
 #INIT, MAKE AND PLAY
 #################################################################
 
 screen=tracker.init(0x10,(100,100))
-tracker.make_pattern(True,pop_corn)
+tracker.make_pattern(True, pop_corn)
 tracker.play_pattern()
 
 

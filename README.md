@@ -27,7 +27,6 @@ The basic framework is:
   1) Import modtrack              - from modtrack import tracker
   2) Init modtrack                - tracker.init
   3) Load or specify your song    - tracker.load / tracker.load_amigamodule / song array=[[--- --- 00 000 000],[--- --- 00 000 000]]
-  5) Synthesize the song          - tracker.make_pattern
   6) Play the song                - tracker.play_pattern
 
 A song array (python list) consists of:
@@ -81,12 +80,9 @@ Samples (instruments) can be internal, wav files or custom waveforms:
     custom_waveform (usr_waveform_array, volume, samplenr, name)
                                      - converts a wavefrom array and returns a sample (optionally set at samplenr)
 
-    octave_transpose                 - must be set before make-pattern (will effect song-array as well as mod files)
     master_volume                    - must be set before make-pattern, can also be set from init()
-    make_pattern (legacy,pattern_text) - converts pattern array into sound, legacy should be set to False if pattern_text is in native format ("C-2 D-2 01 C40 000")
 
     get_play_pos()                   - returns playing position in msecs
-    get_play_row()                   - converts msecs in row nr in pattern
 
     abort_play                       - stops play at next row
     resume_play                      - resume play from paused row

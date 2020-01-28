@@ -10,7 +10,7 @@ import pygame
 screen = tracker.init(0x40,(100,100))
 
 #make default/internal pattern
-tracker.make_pattern()
+tracker.make_pattern(True, None)
 
 #play pattern
 tracker.play_pattern()

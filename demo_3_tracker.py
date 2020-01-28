@@ -26,7 +26,7 @@ nr_rows=12
 resolution=(89*8,(nr_rows+5)*8)
 
 screen = tracker.init(resolution)
-dummy, raw_pattern_text, cumtimings = tracker.make_pattern(True)
+dummy, raw_pattern_text, cumtimings = tracker.make_pattern(True, None)
 
 #load a font
 pygame.font.init()

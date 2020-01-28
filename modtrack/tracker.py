@@ -114,9 +114,7 @@ All user-commands:
     custom_waveform (usr_waveform_array, volume, samplenr, name)
                                      - converts a wavefrom array and returns a sample (optionally set at samplenr)
 
-    octave_transpose                 - must be set before make-pattern (will effect song-array as well as mod files)
     master_volume                    - must be set before make-pattern, can also be set from init()
-    make_pattern (legacy,pattern_text) - converts pattern array into sound, legacy should be set to False if pattern_text is in native format ("C-2 D-2 01 C40 000")
 
     get_play_pos()                   - returns playing position in msecs
     get_play_row()                   - converts msecs in row nr in pattern
@@ -194,7 +192,6 @@ import pygame
 from pygame.locals import *
 import math
 from scipy.io import wavfile
-import numpy
 import numpy as np
 
 from threading import Thread
@@ -206,14 +203,27 @@ from time import sleep, time
 from pygame.mixer import Channel, get_busy, get_num_channels, set_num_channels
 from pygame.sndarray import make_sound
 
+class DebugPrint:
+    def __init__(self):
+        self.indent = 0
+
+    def header(self, name, fmt, args):
+        ind = ' ' * self.indent
+        print('%s* %s %s' % (ind, name, fmt % args))
+        self.indent += 2
+
+    def print(self, fmt, args):
+        print(' ' * self.indent + fmt % args)
+
+    def leave(self):
+        self.indent -= 2
+
+DP = DebugPrint()
+
 #################################################################
 # SET ALL TRACKER VARIABLES AND SOME MUTATION METHODS
 #################################################################
 
-#native amige sample_rate=16574
-#sample_rates <16600 shift freq half note up - #C3 played as C#3
-#sample_rates >20000 work correctly
-#sample_rate = 22050 # will give 25% speed boost compared to 44100
 sample_rate = 44100
 SAMPLE_RATE = 44100
 bits = 16
@@ -226,8 +236,11 @@ MASTER_VOLUME = 0x40
 # This is the volume parameter which is set by the track
 TRACK_VOLUME = 0x20
 
-def init(resolution,
-         flags=pygame.HWSURFACE | pygame.DOUBLEBUF,depth=0):
+# Enabled channels
+ENABLED_CHANNELS = [0]
+# ENABLED_CHANNELS = list(range(4))
+
+def init(resolution, depth=0):
     """
     Initializes the pygame environment for audio.
     :param volume: Master-volume (0-255)
@@ -239,7 +252,7 @@ def init(resolution,
     size = resolution
     pygame.mixer.pre_init(SAMPLE_RATE, -bits, 1)
     pygame.init()
-    display_surf = pygame.display.set_mode(resolution, flags, depth)
+    display_surf = pygame.display.set_mode(resolution)
     return display_surf
 
 tempo=0x7D
@@ -265,7 +278,6 @@ for doct in range(8):
         FREQS[notename] = notefreq
 
 BASE_FREQ = FREQS['C-3']
-print(BASE_FREQ)
 octave_transpose=0
 
 def nth_halfnote(note,n):
@@ -274,26 +286,25 @@ def nth_halfnote(note,n):
     The n in n-th-note can be positive or negative.
     """
     for notenr, notename in enumerate(notelist):
-        if notename == note[0:2]:
+        if notename == note[:2]:
             next_notenr = notenr+n
-            next_oct=int(note[2])
-            if next_notenr<0:
+            next_oct = int(note[2])
+            if next_notenr < 0:
               next_oct=next_oct-1
               next_notenr=next_notenr+12
-            if next_notenr>=12:
-              next_oct=next_oct+1
-              next_notenr=next_notenr-12
-            next_notename=notelist[next_notenr]+str(next_oct)
+            if next_notenr >= 12:
+              next_oct = next_oct+1
+              next_notenr = next_notenr-12
+            next_notename = notelist[next_notenr] + str(next_oct)
             return next_notename
     return "ERR"
+
 def nth_fullnote(note,n):
-    return nth_halfnote(note,n*2)
-def prev_halfnote(note):
-    return nth_halfnote(note,-1)
+    return nth_halfnote(note, n * 2)
+
 def prev_fullnote(note):
     return nth_fullnote(note,-1)
-def next_halfnote(note):
-    return nth_halfnote(note,1)
+
 def next_fullnote(note):
     return nth_fullnote(note,1)
 
@@ -319,7 +330,7 @@ def pulse_sample(sample,nr_samples,amp):
 def sin_sample(sample,nr_samples,amp):
     return int(amp*math.sin(2*math.pi*sample/nr_samples))
 def whitenoise_sample(sample,nr_samples,amp):
-    return np.random.randint(-amp,amp,1,numpy.int16)
+    return np.random.randint(-amp,amp,1,np.int16)
 
 
 def init_samples():
@@ -328,25 +339,25 @@ def init_samples():
     nr_samples = int(SAMPLE_RATE / BASE_FREQ)
     waves_in_3secs = int(3 * BASE_FREQ)
     amp = 255 * 32
-    saw = np.zeros(nr_samples,numpy.int16)
-    tri = np.zeros(nr_samples,numpy.int16)
-    pulse = numpy.zeros(nr_samples,numpy.int16)
-    sin = numpy.zeros(nr_samples,numpy.int16)
-    empty=numpy.zeros(nr_samples,numpy.int16)
+    saw = np.zeros(nr_samples,np.int16)
+    tri = np.zeros(nr_samples,np.int16)
+    pulse = np.zeros(nr_samples,np.int16)
+    sin = np.zeros(nr_samples,np.int16)
+    empty=np.zeros(nr_samples,np.int16)
     for sample in range(0, nr_samples):
         saw[sample] = saw_sample(sample,nr_samples,amp)
         tri[sample] = tri_sample(sample, nr_samples, amp)
         pulse[sample] = pulse_sample(sample, nr_samples, amp)
         sin[sample] = sin_sample(sample, nr_samples, amp)
 
-    saw=numpy.tile(saw,waves_in_3secs)
-    tri=numpy.tile(tri,waves_in_3secs)
-    pulse=numpy.tile(pulse,waves_in_3secs)
-    sin=numpy.tile(sin,waves_in_3secs)
+    saw=np.tile(saw,waves_in_3secs)
+    tri=np.tile(tri,waves_in_3secs)
+    pulse=np.tile(pulse,waves_in_3secs)
+    sin=np.tile(sin,waves_in_3secs)
     #noise should be generated with as much unique random samples as possible.
-    whitenoise=numpy.random.randint(-amp,amp,nr_samples*waves_in_3secs,numpy.int16)
+    whitenoise=np.random.randint(-amp,amp,nr_samples*waves_in_3secs,np.int16)
 
-    empty=numpy.tile(empty,waves_in_3secs)
+    empty=np.tile(empty,waves_in_3secs)
 
     global samples
     samples = [
@@ -405,28 +416,28 @@ def custom_waveform(usr_waveform_array,volume=0x40,samplenr=-1,name=None):
     usr_array=usr_waveform_array
     usr_width=len(usr_array[0])
     usr_height=len(usr_array)
-    waveform=numpy.zeros([usr_width],numpy.int16)
+    waveform=np.zeros([usr_width],np.int16)
     for x in range(usr_width):
         for y in range(len(usr_array)):
             if not usr_array[y][x]==' ': waveform[x]=(y/(usr_height-1)-0.5)*256*255*volume/0x40
 
-    waveform=numpy.array(waveform,numpy.int16)
+    waveform=np.array(waveform,np.int16)
 
-    x_from=numpy.linspace(0,nr_samples,usr_width)
-    x_to=numpy.linspace(0,nr_samples,nr_samples)
+    x_from=np.linspace(0,nr_samples,usr_width)
+    x_to=np.linspace(0,nr_samples,nr_samples)
 
-    full_waveform=numpy.interp(x_to,x_from,waveform)
+    full_waveform=np.interp(x_to,x_from,waveform)
 
-    data = numpy.clip(full_waveform,-32768, 32767)
-    data = data.astype(numpy.int16)
+    data = np.clip(full_waveform,-32768, 32767)
+    data = data.astype(np.int16)
 
-    numpy.set_printoptions(precision=3,
+    np.set_printoptions(precision=3,
                            threshold=40,
                            edgeitems=40, suppress=True)
-    print (numpy.min(data),numpy.max(data),\
-          (numpy.min(data)+numpy.max(data))/2)
+    print (np.min(data),np.max(data),\
+          (np.min(data)+np.max(data))/2)
     print (data.size,data)
-    numpy.set_printoptions(precision=3,
+    np.set_printoptions(precision=3,
                            threshold=8,
                            edgeitems=3, suppress=True)
     #quit()
@@ -500,13 +511,13 @@ def import_amigasample(bytes):
     if len(bytes) == 0:
         # Need some data so function which process audio data won't
         # break.
-        data_16bit_sample_rate = np.zeros(8, numpy.int16)
+        data_16bit_sample_rate = np.zeros(8, np.int16)
     else:
         # first we convert to int8 to convert raw data to signed 8 bit
         # (not only a shift is neccesary but also a mirroring of upper
         # part).
         data_8bit_8287Hz = np.array(bytes, dtype = np.int8)
-        #data_8bit_8287Hz = np.array(bytes).astype(numpy.int8)
+        #data_8bit_8287Hz = np.array(bytes).astype(np.int8)
         #store in 32bit to provide enough room for scaling
         data_16bit_8287Hz = data_8bit_8287Hz.astype(np.int32) * 256
         # clip to 16bit boundaries and fit in 16 bit array
@@ -537,8 +548,8 @@ def load_amigamodule(modfile):
 
     samples = loadmod.samples
     for i, sample in enumerate(samples):
-        name = sample["name"]
-        volume = sample["volume"]
+        name = sample['name']
+        volume = sample['volume']
         amiga_data = sample['data']
         repeat_from = sample['repeat_from']
         repeat_len = sample["repeat_len"]
@@ -739,14 +750,14 @@ def save(pytfilename):
 
     #load sample wav files
     pytfile.write("from scipy.io import wavfile\n")
-    pytfile.write("import numpy\n")
+    pytfile.write("import np\n")
     pytfile.write("for sample in tracker.samples:\n")
     pytfile.write("    filename=sample['filename']\n")
     pytfile.write("    if not filename in ('','internal','modfile'):\n")
     pytfile.write("        fps, data = wavfile.read(filename)\n")
-    pytfile.write("        if numpy.result_type(data )==numpy.float32:\n")
+    pytfile.write("        if np.result_type(data )==np.float32:\n")
     pytfile.write("            data = data * (256* 128-1)\n")
-    pytfile.write("            data = data.astype(numpy.int16)\n")
+    pytfile.write("            data = data.astype(np.int16)\n")
     pytfile.write("        resampled_data = tracker.resample(data,fps)\n")
     pytfile.write("        sample['data']=resampled_data\n")
     pytfile.write("\n")
@@ -780,28 +791,26 @@ def speed_and_tempo_to_msec(speed_hex, tempo_hex):
     speed = speed_hex
     sec_per_beat=60/int(tempo_hex)
     sec_per_row=sec_per_beat/4
-    #sec_per_row=speed*0.02*4*tempo/60
     sec_per_row=sec_per_row*int(speed_hex)/6
     msec_per_row=int(sec_per_row*1000)
+
     return msec_per_row
 
-def stretch_sample_to_freq(freq, wform):
+def stretch_sample_to_freq(freq, arr):
     """Converts the audio data (wfrom) to a specific frequency (freq) by
     stretching the audio data.
     """
-    #assumed is that sample is in C3
-    #    and that sample rate is sample_rate
-    if wform.size < 2:
+    if arr.size < 2:
         return wform
 
-    base_samples = wform.size
-    nr_samples = int(base_samples * BASE_FREQ/freq)
-    # construct x-points for wform and resulting/interpolated wave
-    x_wform = np.linspace(0, 1, wform.size)
-    x_wave = np.linspace(0, 1, nr_samples)
-    # return ndarray
-    wave = np.interp(x_wave, x_wform, wform).astype(numpy.int16)
-    return wave
+    x_old = np.linspace(0, 1, arr.size)
+    x_new = np.linspace(0, 1, int(arr.size * BASE_FREQ / freq))
+    arr_new = np.interp(x_new, x_old, arr).astype(np.int16)
+
+    fmt = 'Frequency interpolation %d -> %d (%.2f Hz)'
+    DP.print(fmt, (arr.size, arr_new.size, freq))
+    return arr_new
+
 
 def deplop_wave(nwave,fadein_msec,fadeout_msec):
     """
@@ -842,6 +851,10 @@ def pad_wave_to_duration(wave, duration):
                        'constant', constant_values=(0, 0))
     else:
         nwave = wave[:tot_samples]
+
+    fmt = 'Padding %d -> %d (%.2f seconds)'
+    args = wave.size, nwave.size, nwave.size / SAMPLE_RATE
+    DP.print(fmt, args)
     return nwave
 
 def sample_to_wave(sample, note, dur_msecs):
@@ -866,10 +879,8 @@ def sample_to_wave(sample, note, dur_msecs):
     data2 = stretch_sample_to_freq(freq, data)
 
     ratio = data2.size / data.size
-    if repeat_from > 0:
-        repeat_from = int(repeat_from*ratio)  #default amiga if no repeat = 0
-    if repeat_len > 2:
-        repeat_len  = int(repeat_len*ratio)    #default amiga if no repeat = 2
+    repeat_from = int(repeat_from*ratio)  #default amiga if no repeat = 0
+    repeat_len  = int(repeat_len*ratio)    #default amiga if no repeat = 2
     datalen=data2.size
 
     if repeat_from:
@@ -896,14 +907,37 @@ def play_wave(arr):
     arr = arr.astype(np.int16)
     snd = make_sound(arr)
     fmt = 'Playing sound with duration %.2f s (%d samples).'
-    print(fmt % (snd.get_length(), arr.size))
+    DP.print(fmt, (snd.get_length(), arr.size))
     Channel(0).queue(snd)
     while get_busy():
         sleep(0.05)
 
+def handle_set_volume(vol, first_sample, cmd_x, cmd_y):
+    val = (cmd_x << 4) + cmd_y
+    vol_i = val / 64 * MASTER_VOLUME / 0xff;
+    vol_p = vol[:first_sample]
+    vol_n = np.full(vol.size - first_sample, vol_i)
+    return np.append(vol_p, vol_n)
+
+def handle_arpeggio(nwave, note1, n_samples, cmd_x, cmd_y):
+    x_wave = np.linspace(0, nwave.size, nwave.size)
+    note2 = nth_halfnote(note1, cmd_x)
+    note3 = nth_halfnote(note1, cmd_y)
+    notes = (note1, note2, note3)
+    freqs = [FREQS.get(note) for note in notes]
+    spaces = [1, freqs[1] / freqs[0], freqs[2] / freqs[0]]
+
+    samples_per_note = int(n_samples / 3 / 2)
+
+
 def handle_volume_slide(vol, speed,
-                        first_sample, n_samples, n_trailing,
-                        dur, cmd_x, cmd_y):
+                        first_sample, n_samples,
+                        cmd_x, cmd_y):
+
+    n_trailing = vol.size - first_sample - n_samples
+
+    dur_s = n_samples / SAMPLE_RATE
+
     ref_tempo = 0x7d
     # Tick speeds and fade durations?
     ref_speed = np.array(
@@ -918,18 +952,20 @@ def handle_volume_slide(vol, speed,
     vol_wt = vol[first_sample:]
 
     if cmd_x != 0:
-        vol_i = (10 * dur / 1000) * cmd_x / 15 * fade_out_mul
+        vol_i = (10 * dur_s) * cmd_x / 15 * fade_out_mul
         vol_w_delta = np.linspace(0, vol_i, n_samples)
         vol_t_delta = np.full(n_trailing, vol_i)
         vol_wt_delta = np.append(vol_w_delta, vol_t_delta)
         vol_wt += vol_wt_delta
     else:
-        vol_i = (1.23 * dur / 1000) * cmd_y / 15 * fade_out_mul
+        vol_i = (1.23 * dur_s) * cmd_y / 15 * fade_out_mul
         vol_w_delta = np.linspace(0, vol_i, n_samples)
         vol_t_delta = np.full(n_trailing, vol_i)
         vol_wt_delta = np.append(vol_w_delta, vol_t_delta)
         vol_wt -= vol_wt_delta
     return np.append(vol_p, vol_wt)
+
+N_WAVES = 0
 
 def modify_wave(sample, notes,
                 effect_speedtempos, effect_cmds, effect_notes):
@@ -959,6 +995,8 @@ def modify_wave(sample, notes,
     # rewrite effect_cmds so a 0 in second or later cmd is replaced by
     # last given value on that position but not all commands do this!
     # e.g. not 1 and 2
+    global N_WAVES
+
 
     db = False
 
@@ -970,6 +1008,8 @@ def modify_wave(sample, notes,
     # First determine how long note should last
     tot_dur = sum(effect_durs)
 
+
+
     # Some effect shorten wave (freq shifting), so we build some slack
     # in.
     freq_shifting=False
@@ -978,22 +1018,25 @@ def modify_wave(sample, notes,
             freq_shifting = True
             break
     if freq_shifting:
-        tot_dur = tot_dur * 2
-
-    # construct wave from sample
+        tot_dur *= 2
     freq = FREQS.get(notes[0])
+
+    args = notes[0], tot_dur, freq_shifting, sample['len'], len(effect_durs)
+    DP.header('MODIFY WAVE', '%s, %d ms (%s), %d, %d effects', args)
 
     wavenote = notes[0]
     if freq != 0:
-        data = sample["data"]
+        data = sample['data']
         wave = sample_to_wave(sample, wavenote, tot_dur)
+
         if notes[1] != "---":
+            print('has second note...')
             wave1 = wave * 0.5
             wave2 = sample_to_wave(sample, notes[1], tot_dur) * 0.5
             min_samples = min(wave1.size, wave2.size)
             wave = wave1[:min_samples] + wave2[:min_samples]
     else:
-        wave = numpy.array([], numpy.int16)
+        wave = np.array([], np.int16)
 
     # Without extra padding some effects which shorten the wave won't
     # work correctly like effect 0 if last effect for note which tries
@@ -1010,6 +1053,7 @@ def modify_wave(sample, notes,
     # Sometimes a mod contains a bug where an effect is applied
     # without a note
     if wavenote == "---":
+        print('bug?')
         return nwave[:tot_samples_real]
 
     # Then we set wave volume to general volume different from C
@@ -1022,7 +1066,7 @@ def modify_wave(sample, notes,
     # Then we handle first-order effects, after which second-order
     # effects.
     for effect_nr in range(2):
-        # Next see, if we have same effects to combine
+        # Next see, if we have same effects to combine.
         neffect_speedtempos = []
         neffect_durs = []
         neffect_cmds = []
@@ -1068,6 +1112,7 @@ def modify_wave(sample, notes,
                                               neffect_notes):
             n_samples = int(dur / 1000 * sample_rate)
             last_sample = first_sample + n_samples
+
             trailing_samples = tot_samples - last_sample
             speed = speedtempo[0]
             tempo = speedtempo[1]
@@ -1087,21 +1132,23 @@ def modify_wave(sample, notes,
             cmd_y = int(cmd[2:3],16)   # for convenience
 
             # Normal play of Arpeggio; xy first halfnote add, second
-            if cmd_id == '0' and not cmd=='000':
+            if cmd_id == '0' and not cmd == '000':
+                assert tot_samples == nwave.size
+
                 # Arpeggio not affected by speed unless speed <3 (than
                 # no (01) or fast (02) arpeggio).
 
                 # Tempo determines arpeggio freq (double tempo is
                 # double freq).
 
-                x_wave = np.linspace(0,tot_samples,tot_samples)
-                if db:
-                    print("tot_samples:", tot_samples)
+                x_wave = np.linspace(0, nwave.size, nwave.size)
                 wavenote2 = nth_halfnote(wavenote, cmd_x)
                 wavenote3 = nth_halfnote(wavenote, cmd_y)
-                if db:
-                    print("wavenote, cmd, cmd_id, cmd_x, cmd_y:",
-                          wavenote, cmd, cmd_id, cmd_x, cmd_y)
+
+                DP.print('Arpeggio %s: %s -> %s -> %s',
+                         (cmd, wavenote, wavenote2, wavenote3))
+                handle_arpeggio(nwave, wavenote, n_samples, cmd_x, cmd_y)
+
                 f1 = FREQS.get(wavenote)
                 f2 = FREQS.get(wavenote2)
                 f3 = FREQS.get(wavenote3)
@@ -1113,19 +1160,13 @@ def modify_wave(sample, notes,
                 if db:
                     print ("space1, space2, space3:",space1, space2, space3)
 
-                nrcycles=2 # seems to by number of cycles in protracker
+                nrcycles = 2 # seems to by number of cycles in protracker
                 samples_pernote = int(n_samples / 3 / nrcycles)
-                #samples_pernote is rounded downwards, so nrcycles*3*samples_pernote can be lower than n_samples
-                #and therefore lead to x_samples.size smaller than n_samples
-                if db:
-                    print ("n_samples      :", n_samples)
-                    print ("samples_pernote :", samples_pernote)
-                    print ("samples arpeggio:", samples_pernote*nrcycles*3)
 
-                x_samples=[]
+                x_samples = []
                 first_sample1 = first_sample
                 first_sample_next = None
-                for cycle in range(0,nrcycles):
+                for cycle in range(nrcycles):
                     first_sample2 = int(first_sample1 + samples_pernote * space1)
                     first_sample3 = int(first_sample2 + samples_pernote * space2)
                     first_sample_next = int(first_sample3 + samples_pernote * space3)
@@ -1148,7 +1189,7 @@ def modify_wave(sample, notes,
                         print("x_sample1, x_sample2, x_sample3,x_samples:", x_sample1.size, x_sample2.size, x_sample3.size,x_samples.size)
                     first_sample1 = first_sample_next
 
-                first_sample_trail=first_sample_next
+                first_sample_trail = first_sample_next
                 x_pre = np.linspace(0, first_sample, first_sample)
                 x_shift = np.append(x_pre, x_samples)
 
@@ -1156,8 +1197,6 @@ def modify_wave(sample, notes,
                 # new samplenrs/x’s bij wave van 1000 samples: 0 – 200  -> 201 – 700 -> 701 – 1000 + zeropad(100)
                 samples_trail = tot_samples - first_sample_trail
                 samples_pad = (tot_samples - first_sample - n_samples) - samples_trail
-                if db:
-                    print ("samples_trail,samples_pad: ",samples_trail,samples_pad )
                 last_sample_trail = first_sample_trail + samples_trail
                 x_trail = np.linspace(first_sample_trail, last_sample_trail, samples_trail)
                 x_pad = np.full(samples_pad, 0,np.int16)
@@ -1199,8 +1238,7 @@ def modify_wave(sample, notes,
                 window_samples = int(n_samples/steps)
                 #x_shift=np.array([],np.int16)
                 x_shift = np.linspace(0, rel_first_sample, first_sample)
-                if db:
-                    print("x_shift pre: ", x_shift.size)
+
                 min_samples = 1
                 max_samples = window_samples * 100
                 if cmd_id == '1':
@@ -1452,26 +1490,16 @@ def modify_wave(sample, notes,
                 volf = handle_volume_slide(volf, speed,
                                            first_sample,
                                            n_samples,
-                                           trailing_samples,
-                                           dur, cmd_x, cmd_y)
+                                           cmd_x, cmd_y)
             elif cmd_id == 'B':  # Position Jump       ; xx songposition
-                # (almost) never used
-                # handled in load_amigamodule()
                 pass
             elif cmd_id == 'C':  # Set Volume	       ; xx volume 00-40
-                #retrigger note/sample will reset volume to 40
-                #volume on one channel will not effect volume on other channel
-                voli= int(cmd_val,16) /64
-                voli= voli * MASTER_VOLUME / 0xFF
-                volp = volf[0:first_sample]
-                voln = np.full(n_samples+trailing_samples, voli)
-                volf = np.append(volp,voln) #faster than np.pad
+                volf = handle_set_volume(volf, first_sample, cmd_x, cmd_y)
             elif cmd_id == 'D':  # Pattern Break       ; xx break position in next pattern
                 #handled in load_amigamodule()
                 pass
             # Set speed 	       ; xx speed (00-1F) / tempo (20-FF)
             elif cmd_id == 'F':
-                #handled in make_pattern()
                 pass
 
             #calc offset of next effect
@@ -1492,14 +1520,17 @@ def modify_wave(sample, notes,
     nwave = nwave[:tot_samples_real]
     nwave = deplop_wave(nwave,5,5)
 
-    # play_wave(nwave)
-    # exit(1)
+    play_wave(nwave)
+    N_WAVES += 1
+    # if N_WAVES == 2:
+    #     exit(1)
+
+
+    DP.leave()
+
 
 
     return nwave.astype(np.int16)
-
-#load_module('TEST_4.MOD')
-
 
 def split_sequence(seq_text):
     """Splits a text sequence to notes, instrument number and effect
@@ -1518,11 +1549,11 @@ def split_sequence(seq_text):
     instr = ''
     parts =seq_text.split()
     err = ""
-    hexchars = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F')
+    hexchars = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+                'A', 'B', 'C', 'D', 'E', 'F')
     for part in parts:
-        if len(part)==3 and \
-             part[1] in ('-','#') and \
-             part[0] in ('A','B','C','D','E','F','G') and \
+        if len(part) == 3 and part[1] in '-#' and \
+             part[0] in 'ABCDEFG' and \
              part[2].isdigit():
                 if part[0:2]=="E#" or part[0:2]=="B#":
                     err= part + " is not a valid note..."
@@ -1692,20 +1723,19 @@ def make_pattern_inner(pattern_text,
                        pattern_refs):
     global samples, sound_lib, octave_transpose
 
+    DP.header('MAKE PATTERN INNER', '', ())
+
     # We return var so address should remain same and =[] will assign
     # new mem slot.
     pattern_refs.clear()
 
-    print('len(pattern_text)', len(pattern_text))
-
     lastrow = len(pattern_text)-1
     lastinstr = "00"
     irow = 0
-    print("===============================")
-    print("MAKE PATTERN - CHANNEL ", ichan, len(pattern_text))
     c = False
     while irow <= lastrow:
         seq = pattern_text[irow][ichan]
+        DP.print('#%03d %s', (irow, seq))
 
         notes, instr, effects = split_sequence(seq)
         notes = transpose(notes, octave_transpose)
@@ -1742,11 +1772,11 @@ def make_pattern_inner(pattern_text,
         # notes on first row are primary note for wave
         effect_notes = ["---"]
         while irow_nextNote == -1:
-            if jrow > lastrow:  # only 64 rows per track
+            if jrow > lastrow:
                 irow_nextNote = lastrow + 1
                 break
             next_seq = pattern_text[jrow][ichan]
-            next_notes, next_instr, next_effects = split_sequence(next_seq)
+            next_notes, _, next_effects = split_sequence(next_seq)
             # notes[1] not supported for chords, only for special
             # effects like #3 and #5
             next_note = next_notes[0] if next_notes else "---"
@@ -1764,20 +1794,11 @@ def make_pattern_inner(pattern_text,
                     effect_speedtempos[0][0],
                     effect_speedtempos[0][1]) + ' ' + next_seq
             jrow = jrow + 1
-
-        if c:
-            print("  effects :", len(effect_cmds),
-                  effect_cmds, effect_speedtempos)
-            print("  group id:", seq_id)
-            print('  next row', irow_nextNote)
+        DP.print('Effects %s', effect_cmds)
 
         if not seq_id in sound_lib:
-            if c:
-                print("mp-sample", sample)
-
             # We rely on modify_wave to padd/trunc wave to match full
             # duration of all rowtimings together.
-
             nwave = modify_wave(sample, notes,
                                 effect_speedtempos,
                                 effect_cmds,
@@ -1787,10 +1808,11 @@ def make_pattern_inner(pattern_text,
         pattern_refs.append(sound_lib[seq_id])
         # restart loop for next Note
         irow = irow_nextNote
+    DP.leave()
 
 
-
-def make_pattern(legacy = True, pattern_text = None):
+# legacy = True, pattern_text = None
+def make_pattern(legacy, pattern_text):
     """Takes a list (pattern_text) of strings in which each string consists of seperate parts per channel with a total of 4 parts/sequences.
     Per channel/track the sequences are grouped in initial note sequence and successive effect sequences and each group is converted to a sound object.
     These sound objects are added to a list for each track/channel.
@@ -1852,11 +1874,11 @@ def make_pattern(legacy = True, pattern_text = None):
     background_threads=[]
     pattern_refs = [[], [], [], []]
 
-    for chan in range(4):
+    for i in ENABLED_CHANNELS:
         try:
-            make_pattern_inner(pattern_text, chan,
+            make_pattern_inner(pattern_text, i,
                                pattern_rowspeedtempos,
-                               pattern_refs[chan])
+                               pattern_refs[i])
         except ZeroDivisionError:
             print('Divide by Zero!')
         except ValueError:
@@ -1874,7 +1896,7 @@ def make_pattern(legacy = True, pattern_text = None):
     global soundrefs,rowstarttimings
     pattern = pattern_text
     soundrefs = pattern_refs
-    rowstarttimings=pattern_rowstarttimings
+    rowstarttimings = pattern_rowstarttimings
     return soundrefs, pattern_text, rowstarttimings
 
 def play_pattern(pattern_soundrefs = None, from_time = 0):
@@ -1908,11 +1930,12 @@ def get_play_pos():
 _lastplayrow_=0
 _rowstarttimings_=[]
 
-def get_play_row(row_starttimings=None):
-    global play_pos,_lastplayrow_,rowstarttimings
+def get_play_row(row_starttimings = None):
+    global play_pos, _lastplayrow_, rowstarttimings
     if row_starttimings==None:
         row_starttimings=rowstarttimings
-    if len(row_starttimings)==0: return -1
+    if len(row_starttimings)==0:
+        return -1
 
     pos_msec=play_pos*1000
     if row_starttimings[_lastplayrow_] > pos_msec:
@@ -1966,7 +1989,7 @@ def play_pattern_inner(pattern_soundrefs = None, from_time = 0):
                     break
                 dur = dur + sndlen
     else:
-        for ichan in range(4):
+        for ichan in ENABLED_CHANNELS:
             first_snds[ichan] = pattern_soundrefs[ichan][0]
 
     soundref_lengths = [len(sr) for sr in pattern_soundrefs]
@@ -1980,15 +2003,12 @@ def play_pattern_inner(pattern_soundrefs = None, from_time = 0):
     pause_time = NOT_PAUSED #needed to restart on resume
     endtime = [0,0,0,0]
 
-    #filtered_channels = [0]
-    filtered_channels = list(range(4))
-
     # Play first samples.
-    for ichan in filtered_channels:
+    for ichan in ENABLED_CHANNELS:
         Channel(ichan).queue(first_snds[ichan])
 
     # Continue filling queues with new sounds and detect user events.
-    while playing:
+    while True:
         if pause_time == NOT_PAUSED:
             new_play_pos = time() - play_starttime + from_time
 
@@ -2001,41 +2021,27 @@ def play_pattern_inner(pattern_soundrefs = None, from_time = 0):
                 play_pattern_inner(pattern_soundrefs, play_pos)
                 return
 
-        # Handle play requests.
         if req_abortplay:
-            req_abortplay = False
-            for ichan in range(4):
-                Channel(ichan).stop()
-            playing=False
             return
-        if req_pause:
-            req_pause  = False
-            print ("REQ PAUSE")
-            for ichan in range(4):
-                pygame.mixer.Channel(ichan).stop() # clears queue
-            pause_time=play_pos
 
         # Keep queue filled, if empty add next sound to channel queue.
         if pause_time == NOT_PAUSED:
-            for ichan in filtered_channels:
-                if not Channel(ichan).get_queue():
-                    if idx[ichan] < len(pattern_soundrefs[ichan]):
-                        channel = pattern_soundrefs[ichan]
-                        snd = channel[idx[ichan]]
-                        Channel(ichan).queue(snd)
-                        idx[ichan] += 1
-                        print(f'Refilling #{ichan} w/idx {idx[ichan]}')
-                if not Channel(ichan).get_busy():
-                    if idx[ichan] >= len(pattern_soundrefs[ichan]):
-                        if endtime[ichan]==0:
+            for i in ENABLED_CHANNELS:
+                if not Channel(i).get_queue():
+                    if idx[i] < len(pattern_soundrefs[i]):
+                        channel = pattern_soundrefs[i]
+                        snd = channel[idx[i]]
+                        Channel(i).queue(snd)
+                        idx[i] += 1
+                        print(f'Refilling #{i} w/idx {idx[i]}')
+                if not Channel(i).get_busy():
+                    if idx[i] >= len(pattern_soundrefs[i]):
+                        if endtime[i]==0:
                             dt = time()-play_starttime
-                            endtime[ichan] = dt
+                            endtime[i] = dt
                             nr_ended = nr_ended + 1
                 if nr_ended == 4:
                     playing = False
             # Next channel
             # We don't want to hog CPU, so wait a bit.
             sleep(queue_update_interval_sec)
-    print('not playing anymore')
-    while get_busy():
-        sleep(0.05)
