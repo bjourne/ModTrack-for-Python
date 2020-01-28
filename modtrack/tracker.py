@@ -241,7 +241,7 @@ MASTER_VOLUME = 0x40
 TRACK_VOLUME = 0x20
 
 # Enabled channels
-ENABLED_CHANNELS = [1]
+ENABLED_CHANNELS = [2, 3]
 #ENABLED_CHANNELS = list(range(4))
 
 def init(resolution, depth=0):
@@ -1054,9 +1054,7 @@ def modify_wave(sample, notes,
     # e.g. not 1 and 2
     global N_WAVES
 
-
     db = False
-
     # Create row durations
 
     effect_durs = [speed_and_tempo_to_msec(st[0], st[1])
@@ -1064,8 +1062,6 @@ def modify_wave(sample, notes,
 
     # First determine how long note should last
     tot_dur = sum(effect_durs)
-
-
 
     # Some effect shorten wave (freq shifting), so we build some slack
     # in.
@@ -1111,6 +1107,7 @@ def modify_wave(sample, notes,
     # without a note
     if wavenote == "---":
         print('bug?')
+        DP.leave()
         return nwave[:tot_samples_real]
 
     # Then we set wave volume to general volume different from C
@@ -1493,6 +1490,8 @@ def modify_wave(sample, notes,
     nwave = nwave[:tot_samples_real]
     nwave = deplop_wave(nwave,5,5)
 
+    DP.print('%.2f seconds', nwave.size / SAMPLE_RATE)
+    #exit(1)
     # play_wave(nwave)
     # N_WAVES += 1
     # if N_WAVES == 2:
@@ -1767,7 +1766,7 @@ def make_pattern_inner(pattern_text,
                     effect_speedtempos[0][0],
                     effect_speedtempos[0][1]) + ' ' + next_seq
             jrow = jrow + 1
-        DP.print('Effects %s', effect_cmds)
+        DP.print('Number of effects %d', len(effect_cmds))
 
         if not seq_id in sound_lib:
             # We rely on modify_wave to padd/trunc wave to match full
@@ -1844,7 +1843,7 @@ def make_pattern(legacy, pattern_text):
     lastinstr="00"
 
     t0 = time()
-    background_threads=[]
+    #background_threads=[]
     pattern_refs = [[], [], [], []]
 
     for i in ENABLED_CHANNELS:
