@@ -222,26 +222,25 @@ class DebugPrint:
     def leave(self):
         self.indent -= 2
 
-DP = DebugPrint(False)
+DP = DebugPrint(True)
 
 #################################################################
 # SET ALL TRACKER VARIABLES AND SOME MUTATION METHODS
 #################################################################
 
-sample_rate = 44100
 SAMPLE_RATE = 44100
-bits = 16
+BITS = 16
 
 # from 0x00 to 0xFF; sometime the volume of the track is too loud, so
 # this var helps you scale it down
 
 MASTER_VOLUME = 0x40
 
-# This is the volume parameter which is set by the track
-TRACK_VOLUME = 0x20
+# # This is the volume parameter which is set by the track
+# TRACK_VOLUME = 0x20
 
 # Enabled channels
-ENABLED_CHANNELS = [2, 3]
+ENABLED_CHANNELS = [2]
 #ENABLED_CHANNELS = list(range(4))
 
 def init(resolution, depth=0):
@@ -252,15 +251,14 @@ def init(resolution, depth=0):
     :param flags: window flags
     :param depth: window depth
     """
-    global size, bits
     size = resolution
-    pygame.mixer.pre_init(SAMPLE_RATE, -bits, 1)
+    pygame.mixer.pre_init(SAMPLE_RATE, -BITS, 1)
     pygame.init()
     display_surf = pygame.display.set_mode(resolution)
     return display_surf
 
-tempo=0x7D
-speed=0x06
+tempo = 0x7D
+speed = 0x06
 
 notelist = [
     "C-", "C#", "D-", "D#", "E-", "F-",
@@ -705,7 +703,7 @@ def save(pytfilename):
         if sample_filename in ("internal", "modfile") and sample_name:
             sample_filename = sample_path + "/" + sample_name + ".wav"
             #save data
-            wavfile.write(sample_filename, sample_rate, sample_data)
+            wavfile.write(sample_filename, SAMPLE_RATE, sample_data)
             #reset filename
             sample["filename"] = sample_filename
 
@@ -821,13 +819,13 @@ def deplop_wave(nwave,fadein_msec,fadeout_msec):
     Reduces the plops at start and end of wave by slowly increasing (fadein_msec) and decreasing (fadeout_msec) the volume
     """
     #finally we fade volume at last 5msec of signal to avoid pop at end
-    nr_samples = int(fadein_msec/1000*sample_rate)
+    nr_samples = int(fadein_msec/1000 * SAMPLE_RATE)
     for i in range(0,nr_samples):
         vol=i/nr_samples
         sample=nwave[i]
         nsample=int(sample*vol)
         nwave[i]=nsample
-    nr_samples=int(fadeout_msec/1000*sample_rate)
+    nr_samples=int(fadeout_msec/1000 * SAMPLE_RATE)
     for i in range(0,nr_samples):
         vol=i/nr_samples
         sample_nr=nwave.size-i-1
@@ -916,6 +914,25 @@ def play_wave(arr):
     while get_busy():
         sleep(0.05)
 
+def handle_slide_up(nwave, first_sample, n_samples):
+    last_sample = first_sample + n_samples
+
+    rel_first_sample = first_sample / nwave.size
+    rel_last_sample = last_sample / nwave.size
+
+    x_wave = np.linspace(0, 1, nwave.size)
+    dur_s = n_samples / SAMPLE_RATE
+    steps_per_s = 60
+    steps = int(dur_s * steps_per_s)
+
+    window_samples = int(n_samples / steps)
+
+    x_shift = np.linspace(0, rel_first_sample, first_sample)
+    min_samples = 1
+    max_samples = window_samples * 100
+
+
+
 def handle_set_volume(vol, first_sample, cmd_x, cmd_y):
     val = (cmd_x << 4) + cmd_y
     vol_i = val / 64 * MASTER_VOLUME / 0xff;
@@ -974,18 +991,6 @@ def handle_arpeggio(vol, nwave, note1, first_sample, n_samples, cmd_x, cmd_y):
 
     DP.leave()
     return nwave, vol
-
-
-
-def create_arpeggio_cycles(first_sample, n_samples, n_cycles, freqs):
-    spaces = (1, freqs[1] / freqs[0], freqs[2] / freqs[0])
-
-    # x_samples = []
-    # samples_per_note = int(n_samples / 3 / n_cycles)
-    # x_samples = [
-    #     [np.linspace(first_sample     ] for idx in range(n_cycles)]
-    # ]
-
 
 def handle_volume_slide(vol, speed,
                         first_sample, n_samples,
@@ -1113,8 +1118,8 @@ def modify_wave(sample, notes,
     # Then we set wave volume to general volume different from C
     # command which only sends volume of 1 sample range of volume in
     # track is 0-64 (0x00-0x40); master_volume is 0-255 (0x00-0xFF).
-    vol_i = TRACK_VOLUME / 64
-    vol_i = vol_i * MASTER_VOLUME / 0xFF
+    #vol_i = TRACK_VOLUME / 64
+    vol_i = MASTER_VOLUME / 0xFF
     volf = np.full(nwave.size, vol_i)
 
     # Then we handle first-order effects, after which second-order
@@ -1165,7 +1170,7 @@ def modify_wave(sample, notes,
                                               neffect_durs,
                                               neffect_cmds,
                                               neffect_notes):
-            n_samples = int(dur / 1000 * sample_rate)
+            n_samples = int(dur / 1000 * SAMPLE_RATE)
             last_sample = first_sample + n_samples
 
             trailing_samples = tot_samples - last_sample
@@ -1190,21 +1195,25 @@ def modify_wave(sample, notes,
                 tot_samples = nwave.size
             # Slide Up/Dwn/ToNote       ; xx upspeed
             elif cmd_id in '123':
-                #prevSamples not effected,
-                # n_samples freq is stretched/squeezed
-                # trailing_samples has ending freq
-                #max bend for 1 octave (C-3 - B-3) at F06, F7D (120ms/row) is achieved at 7 rows, max bend of 2 octaves at 14 rows
+                # prevSamples not effected, n_samples freq is
+                # stretched/squeezed trailing_samples has ending freq
+                # max bend for 1 octave (C-3 - B-3) at F06, F7D
+                # (120ms/row) is achieved at 7 rows, max bend of 2
+                # octaves at 14 rows
 
-                rel_first_sample = first_sample/tot_samples
-                rel_last_sample = last_sample/tot_samples
+                assert tot_samples == nwave.size
 
-                x_wave = np.linspace(0, 1, tot_samples)
+                handle_slide_up(nwave, first_sample, n_samples)
+
+                rel_first_sample = first_sample / nwave.size
+                rel_last_sample = last_sample / nwave.size
+
+                x_wave = np.linspace(0, 1, nwave.size)
                 steps_per_sec = 60
                 # Steps should increase if duration of effect
                 # increases, otherwise the steps will be heard.
                 steps = int(dur/1000*steps_per_sec)
-                if db:
-                    print ("steps:",steps)
+
                 window_samples = int(n_samples/steps)
                 #x_shift=np.array([],np.int16)
                 x_shift = np.linspace(0, rel_first_sample, first_sample)
@@ -1220,11 +1229,11 @@ def modify_wave(sample, notes,
                     print ("NOTES:",note)
                 targetnote = note
                 basefreq = FREQS[basenote]
-                targetfreq = basefreq + (FREQS[targetnote] - basefreq)
+                targetfreq = FREQS[targetnote]
                 if targetfreq > FREQS[targetnote]:
                     targetfreq = FREQS[targetnote]
-                if db:
-                    print ("basenote, targetnote: ", basenote, targetnote)
+
+                DP.print("base %s, target %s", (basenote, targetnote))
                 if basefreq < targetfreq:
                     dsamples = -cmd_xy * 10.5 * speed/6 * tempo/0x7D /8
                     min_samples = int(window_samples * basefreq / targetfreq)
@@ -1233,10 +1242,6 @@ def modify_wave(sample, notes,
                     dsamples = +cmd_xy * 5 * speed/6 * tempo/0x7D
                     max_samples = int(window_samples * basefreq / targetfreq)
                 ct=0
-                if db:
-                    print ("min-max samples: ",min_samples,max_samples)
-                if db:
-                    print ("rel_first_sample,rel_last_sample: ","%.3f" % rel_first_sample,"%.3f" % rel_last_sample)
                 for i in range(steps):
                     if i > 0:
                         ct=1
@@ -1295,7 +1300,7 @@ def modify_wave(sample, notes,
                 dsamples = x_wave[first_sample + 1] - x_wave[first_sample]
                 #freq=cmd_x * x_window.size/sample_rate
                 #oscillation frequency / speed of changes of note frequency
-                freq = 0.6 * cmd_x * n_samples / sample_rate * (tempo / 0x7D) # freq increased if more samples
+                freq = 0.6 * cmd_x * n_samples / SAMPLE_RATE * (tempo / 0x7D) # freq increased if more samples
                 if freq==0:
                     break
                 #how much up and down we want the note frequency oscillate
@@ -1426,8 +1431,9 @@ def modify_wave(sample, notes,
                 #LFO 3-10Hz
                 freq = 10 * cmd_x / 15 #10Hz max, don't now what LFO's freq in FastTracker is
                 freq=freq * tempo/0x7D
-                if freq==0:freq=1
-                window = sample_rate // freq
+                if freq==0:
+                    freq=1
+                window = SAMPLE_RATE // freq
                 #print ("freq,window:",freq,window)
                 if window==0: window=1
                 nr_windows = math.ceil(n_samples / window + 1)
@@ -1492,10 +1498,10 @@ def modify_wave(sample, notes,
 
     DP.print('%.2f seconds', nwave.size / SAMPLE_RATE)
     #exit(1)
-    # play_wave(nwave)
-    # N_WAVES += 1
-    # if N_WAVES == 2:
-    #     exit(1)
+    play_wave(nwave)
+    N_WAVES += 1
+    if N_WAVES == 1:
+        exit(1)
 
 
     DP.leave()
