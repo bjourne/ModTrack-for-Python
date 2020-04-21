@@ -198,7 +198,6 @@ from threading import Thread
 import os
 
 from copy import deepcopy
-from sys import exit
 from time import sleep, time
 from pygame.mixer import Channel, get_busy, get_num_channels, set_num_channels
 from pygame.sndarray import make_sound
@@ -240,8 +239,7 @@ MASTER_VOLUME = 0x40
 # TRACK_VOLUME = 0x20
 
 # Enabled channels
-ENABLED_CHANNELS = [2]
-#ENABLED_CHANNELS = list(range(4))
+ENABLED_CHANNELS = list(range(4))
 
 def init(resolution, depth=0):
     """
@@ -1027,8 +1025,6 @@ def handle_volume_slide(vol, speed,
         vol_wt -= vol_wt_delta
     return np.append(vol_p, vol_wt)
 
-N_WAVES = 0
-
 def modify_wave(sample, notes,
                 effect_speedtempos, effect_cmds, effect_notes):
     """Takes a sample with audio data converts this to a wave with the
@@ -1057,8 +1053,6 @@ def modify_wave(sample, notes,
     # rewrite effect_cmds so a 0 in second or later cmd is replaced by
     # last given value on that position but not all commands do this!
     # e.g. not 1 and 2
-    global N_WAVES
-
     db = False
     # Create row durations
 
@@ -1483,7 +1477,9 @@ def modify_wave(sample, notes,
 
             # check if tot_samples equals length of nwave
             if not nwave.size == tot_samples:
-                errmsg = "Total size of nwave changed (" + str(tot_samples) + "->" + str(nwave.size) + ")! Bug present in effect " + cmd_id+" ("+cmd+")."
+                errmsg = "Total size of nwave changed (" \
+                    + str(tot_samples) + "->" + str(nwave.size) \
+                    + ")! Bug present in effect " + cmd_id+" ("+cmd+")."
                 raise ValueError(errmsg)
 
 
@@ -1497,16 +1493,7 @@ def modify_wave(sample, notes,
     nwave = deplop_wave(nwave,5,5)
 
     DP.print('%.2f seconds', nwave.size / SAMPLE_RATE)
-    #exit(1)
-    play_wave(nwave)
-    N_WAVES += 1
-    if N_WAVES == 1:
-        exit(1)
-
-
     DP.leave()
-
-
 
     return nwave.astype(np.int16)
 
