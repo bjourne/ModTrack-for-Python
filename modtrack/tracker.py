@@ -201,27 +201,8 @@ from copy import deepcopy
 from time import sleep, time
 from pygame.mixer import Channel, get_busy, get_num_channels, set_num_channels
 from pygame.sndarray import make_sound
+from modtrack import DP
 
-class DebugPrint:
-    def __init__(self, enabled):
-        self.indent = 0
-        self.enabled = enabled
-
-    def print_indented(self, text):
-        if self.enabled:
-            print(' ' * self.indent + text)
-
-    def header(self, name, fmt, args):
-        self.print_indented('* %s %s' % (name, fmt % args))
-        self.indent += 2
-
-    def print(self, fmt, args):
-        self.print_indented(fmt % args)
-
-    def leave(self):
-        self.indent -= 2
-
-DP = DebugPrint(True)
 
 #################################################################
 # SET ALL TRACKER VARIABLES AND SOME MUTATION METHODS
@@ -544,7 +525,6 @@ def load_amigamodule(modfile):
 
     #copy info to local vars
     filename = modfile
-    songtitle = loadmod.songtitle
 
     samples = loadmod.samples
     for i, sample in enumerate(samples):
@@ -672,100 +652,6 @@ def load(pytfilename):
 
     exec (content)
     filename=pytfilename
-    return
-
-def save(pytfilename):
-    """Saves a composition in the internal format consisting of a python
-    file and a subdirectory with all used samples.
-
-    :param pytfilename: Filename to save (should have .pyt extension.)
-    """
-    # replace \ with / to prevent unintended escapes in string
-    pytfilename = pytfilename.replace("\\", "/")
-    global filename
-    filename = pytfilename #full filename
-
-    #save internal sample data if needed
-    bare_filename = os.path.basename(pytfilename)
-    bare_filetitle= os.path.splitext(bare_filename)[0]
-    bare_path = os.path.dirname(pytfilename)
-    sample_path = bare_path + "/" + bare_filetitle + ".samples"
-    # Make subdir if neccessary
-    if not os.path.exists(sample_path):
-        os.makedirs(sample_path)
-    for nr, sample in enumerate(samples):
-        sample_filename = sample["filename"]
-        sample_data = sample['data']
-        sample_name = sample["name"]
-        # Don't save empty samples.
-        if sample_filename in ("internal", "modfile") and sample_name:
-            sample_filename = sample_path + "/" + sample_name + ".wav"
-            #save data
-            wavfile.write(sample_filename, SAMPLE_RATE, sample_data)
-            #reset filename
-            sample["filename"] = sample_filename
-
-    #open pyt file and save meta data and track data
-    pytfile = open(pytfilename, 'w')
-
-    pytfile.write("import tracker\n\n")
-    pytfile.write("tracker.filename  = '{}'\n".format(pytfilename))
-    pytfile.write("tracker.songtitle = '%s'\n" % songtitle)
-    pytfile.write("\n")
-
-    #save meta info of samples
-    lastsample = len(samples)-1
-    pytfile.write     ("tracker.samples = [\n")
-    for nr,sample in enumerate(samples):
-        pytfile.write ("                     {\n")
-        pytfile.write ("                        'name'        :'{}',\n"\
-                       "                        'filename'    :'{}',\n"\
-                       "                        'volume'      :'{}',\n"\
-                       "                        'repeat_from' :{},\n"\
-                       "                        'repeat_len'  :{},\n"\
-                       "                        'len'         :{}\n".format(
-                                                sample['name'],
-                                                sample['filename'],
-                                                sample['volume'],
-                                                sample['repeat_from'],
-                                                sample['repeat_len'],
-                                                sample['len']
-                                                )
-                       )
-        pytfile.write ("                      }")
-        if nr < lastsample:
-            pytfile.write(",\n")
-    pytfile.write ("\n                    ]\n")
-    pytfile.write("\n")
-
-    #pattern data
-    lastrow=len(pattern)-1
-    pytfile.write("tracker.pattern = [\n")
-    for nr,row in enumerate(pattern):
-        pytfile.write("                 %s" % row)
-        if nr<lastrow:
-            pytfile.write(",\n")
-        pass
-    pytfile.write("\n               ]\n\n")
-
-    #load sample wav files
-    pytfile.write("from scipy.io import wavfile\n")
-    pytfile.write("import np\n")
-    pytfile.write("for sample in tracker.samples:\n")
-    pytfile.write("    filename=sample['filename']\n")
-    pytfile.write("    if not filename in ('','internal','modfile'):\n")
-    pytfile.write("        fps, data = wavfile.read(filename)\n")
-    pytfile.write("        if np.result_type(data )==np.float32:\n")
-    pytfile.write("            data = data * (256* 128-1)\n")
-    pytfile.write("            data = data.astype(np.int16)\n")
-    pytfile.write("        resampled_data = tracker.resample(data,fps)\n")
-    pytfile.write("        sample['data']=resampled_data\n")
-    pytfile.write("\n")
-    pytfile.write("print ('{} loaded!')\n".format(pytfilename))
-
-    #close
-    pytfile.close()
-    print("Saved:'" + pytfilename + "'")
     return
 
 #################################################################
@@ -1073,7 +959,8 @@ def modify_wave(sample, notes,
         tot_dur *= 2
     freq = FREQS.get(notes[0])
 
-    args = notes[0], tot_dur, freq_shifting, sample['len'], len(effect_durs)
+    args = (notes[0], tot_dur, freq_shifting,
+            sample['len'], len(effect_durs))
     DP.header('MODIFY WAVE', '%s, %d ms (%s), %d, %d effects', args)
 
     wavenote = notes[0]
@@ -1105,7 +992,7 @@ def modify_wave(sample, notes,
     # Sometimes a mod contains a bug where an effect is applied
     # without a note
     if wavenote == "---":
-        print('bug?')
+        DP.print('Effect without a note %s!', effect_cmds[0])
         DP.leave()
         return nwave[:tot_samples_real]
 
